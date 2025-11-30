@@ -1,0 +1,27 @@
+__pycache__/
+*.pyc
+.env
+.env.*
+*.log
+*.sqlite
+.DS_Store
+.idea/
+.vscode/
+# --- Data / Temporary files ---
+data/
+datasets/
+uploads/
+tmp/
+__temp__/
+cache/
+*.csv
+*.json
+# --- Secrets / Credentials ---
+serviceAccountKey.json
+firebase-key.json
+credentials.json
+google_credentials.json
+
+# Redis
+dump.rdb
+appendonly.aof
