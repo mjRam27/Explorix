@@ -36,19 +36,27 @@ def fetch_departures(station_id: str, duration: int = 30):
 
 
 def _fetch_and_format_departures(station_id: str, duration: int):
-    url = f"https://v6.vbb.transport.rest/stops/{station_id}/departures"
+    # FIXED v6 endpoint
+    url = "https://v6.vbb.transport.rest/departures"
+
     params = {
+        "stop": station_id,
         "duration": duration,
         "language": "en"
     }
 
-    response = requests.get(url, params=params)
+    response = requests.get(url, params=params, headers={"User-Agent": "Explorix-App"})
     response.raise_for_status()
+
     raw_departures = response.json()
+
+    # Validate correct response format
+    if not isinstance(raw_departures, list):
+        raise ValueError(f"Unexpected departures format from VBB: {raw_departures}")
 
     departures = []
     for dep in raw_departures:
-        if dep.get("when"):  # Skip invalid ones
+        if isinstance(dep, dict) and dep.get("when"):
             departures.append({
                 "tripId": dep.get("tripId"),
                 "line": dep.get("line", {}).get("name", "N/A"),
