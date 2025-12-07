@@ -2,7 +2,8 @@ import requests
 from utils.db_redis import get_cached_departure, cache_departure, redis_client
 
 # Station IDs you want to cache
-CACHED_STATIONS = {"900000003201", "900000260009"}
+CACHED_STATIONS = {"900100003", "900100026"}
+
 
 def fetch_departures(station_id: str, duration: int = 30):
     key = f"departures:{station_id}"
@@ -37,25 +38,27 @@ def fetch_departures(station_id: str, duration: int = 30):
 
 def _fetch_and_format_departures(station_id: str, duration: int):
     # FIXED v6 endpoint
-    url = "https://v6.vbb.transport.rest/departures"
-
+    url = f"https://v6.vbb.transport.rest/stops/{station_id}/departures"
     params = {
-        "stop": station_id,
         "duration": duration,
         "language": "en"
     }
 
+
     response = requests.get(url, params=params, headers={"User-Agent": "Explorix-App"})
     response.raise_for_status()
 
-    raw_departures = response.json()
+    raw = response.json()
 
-    # Validate correct response format
-    if not isinstance(raw_departures, list):
-        raise ValueError(f"Unexpected departures format from VBB: {raw_departures}")
+    # NEW → v6 response wraps departures inside a dict
+    departures_list = raw.get("departures", [])
+
+    if not isinstance(departures_list, list):
+        raise ValueError(f"Unexpected departures format: {raw}")
+
 
     departures = []
-    for dep in raw_departures:
+    for dep in departures_list:
         if isinstance(dep, dict) and dep.get("when"):
             departures.append({
                 "tripId": dep.get("tripId"),
