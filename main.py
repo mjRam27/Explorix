@@ -18,6 +18,9 @@ from services.itinerary import router as itinerary_router
 from services.feeds_service import router as feeds_router
 from services.connect_service import router as connect_router
 from services.profile_service import router as profile_router
+from routes.search import router as search_router
+from services import pois, geo_features
+
 
 
 app = FastAPI()
@@ -43,7 +46,9 @@ app.include_router(itinerary_router)
 app.include_router(feeds_router)
 app.include_router(connect_router)
 app.include_router(profile_router)
-
+app.include_router(search_router)
+app.include_router(pois.router)
+app.include_router(geo_features.router)
 
 @app.on_event("startup")
 async def startup_event():
