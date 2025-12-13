@@ -1,120 +1,145 @@
-import pandas as pd
 from fastapi import APIRouter, Query, HTTPException
-import os
-import numpy as np
-from math import radians, sin, cos, sqrt, atan2
+from utils.postgres import SessionLocal
+from sqlalchemy.sql import text
 
 router = APIRouter(prefix="/pois", tags=["POIs"])
 
-DATA_PATH = "data/Baden-Württemberg_pois.csv"
 
-
-def load_data():
-    """Load and clean the POI dataset."""
-    if not os.path.exists(DATA_PATH):
-        raise HTTPException(status_code=404, detail=f"Dataset not found at {DATA_PATH}")
-
-    df = pd.read_csv(DATA_PATH)
-
-    # Normalize and clean up columns
-    expected_cols = ["name", "category", "lat", "lon", "state", "sunrise", "sunset"]
-    for col in expected_cols:
-        if col not in df.columns:
-            df[col] = ""
-
-    # Handle NaN/inf
-    df = df.replace([np.inf, -np.inf], np.nan).fillna("")
-
-    # Ensure correct types
-    df["category"] = df["category"].astype(str).str.lower().str.strip()
-    df["state"] = df["state"].astype(str).str.lower().str.strip()
-    df["name"] = df["name"].astype(str).str.strip()
-
-    return df
-
-
+# ---------------------------------------------------------
+# GET /pois → List POIs with filters
+# ---------------------------------------------------------
 @router.get("/")
 def get_pois(
-    category: str | None = Query(None, description="Filter by category (e.g., 'lakes', 'parks', 'restaurants')"),
-    state: str | None = Query(None, description="Filter by state (e.g., 'baden' or 'baden-württemberg')"),
-    limit: int = Query(20, description="Maximum number of results to return")
+    category: str | None = Query(None, description="Filter by category"),
+    city: str | None = Query(None, description="Filter by city"),
+    poi_type: str | None = Query(None, description="Filter by POI type (stay, food, attraction)"),
+    limit: int = Query(20, ge=1, le=100)
 ):
-    """Get filtered list of POIs."""
-    df = load_data()
+    session = SessionLocal()
 
-    # Apply filters flexibly
+    sql = """
+    SELECT
+        id,
+        title,
+        category,
+        poi_type,
+        rating,
+        city,
+        state,
+        website
+    FROM poi
+    WHERE 1=1
+    """
+
+    params = {}
+
     if category:
-        df = df[df["category"].str.contains(category.lower(), na=False)]
-    if state:
-        df = df[df["state"].str.contains(state.lower(), na=False)]
+        sql += " AND category ILIKE :category"
+        params["category"] = f"%{category}%"
 
-    if df.empty:
-        return {"message": "No POIs found for the given filters."}
+    if city:
+        sql += " AND city ILIKE :city"
+        params["city"] = f"%{city}%"
 
-    # Replace remaining NaN or inf before returning
-    df = df.replace([np.inf, -np.inf], np.nan).fillna("")
+    if poi_type:
+        sql += " AND poi_type = :poi_type"
+        params["poi_type"] = poi_type
 
-    # Return cleaned subset
-    return df.head(limit).to_dict(orient="records")
+    sql += """
+    ORDER BY rating DESC NULLS LAST
+    LIMIT :limit
+    """
+    params["limit"] = limit
+
+    result = session.execute(text(sql), params).fetchall()
+    session.close()
+
+    if not result:
+        return {"message": "No POIs found"}
+
+    return [dict(row._mapping) for row in result]
 
 
+# ---------------------------------------------------------
+# GET /pois/categories → List available categories
+# ---------------------------------------------------------
 @router.get("/categories")
 def list_categories():
-    """List all unique categories available in the dataset."""
-    df = load_data()
-    unique_categories = sorted(df["category"].dropna().unique().tolist())
-    return {"categories": unique_categories, "count": len(unique_categories)}
+    session = SessionLocal()
+
+    sql = """
+    SELECT DISTINCT category
+    FROM poi
+    WHERE category IS NOT NULL
+    ORDER BY category;
+    """
+
+    result = session.execute(text(sql)).fetchall()
+    session.close()
+
+    return {
+        "categories": [row[0] for row in result],
+        "count": len(result)
+    }
 
 
-@router.get("/columns")
-def get_columns():
-    """Return dataset column names and a sample preview."""
-    try:
-        df = load_data()
-        return {
-            "columns": list(df.columns),
-            "sample": df.head(5).to_dict(orient="records"),
-            "path_checked": os.path.abspath(DATA_PATH)
-        }
-    except Exception as e:
-        return {"error": str(e), "path_checked": os.path.abspath(DATA_PATH)}
+# ---------------------------------------------------------
+# GET /pois/{poi_id} → POI detail
+# ---------------------------------------------------------
+@router.get("/{poi_id}")
+def get_poi_detail(poi_id: int):
+    session = SessionLocal()
+
+    sql = """
+    SELECT *
+    FROM poi
+    WHERE id = :poi_id
+    """
+
+    result = session.execute(
+        text(sql),
+        {"poi_id": poi_id}
+    ).fetchone()
+
+    session.close()
+
+    if not result:
+        raise HTTPException(status_code=404, detail="POI not found")
+
+    return dict(result._mapping)
 
 
-
-
-@router.get("/nearby")
-def get_nearby_pois(
-    lat: float = Query(..., description="Latitude of the center point"),
-    lon: float = Query(..., description="Longitude of the center point"),
-    radius: float = Query(10, description="Radius in kilometers"),
-    category: str | None = Query(None, description="Optional category filter (e.g., 'lakes')")
+# ---------------------------------------------------------
+# GET /pois/search → Text search (fast, explainable)
+# ---------------------------------------------------------
+@router.get("/search")
+def search_poi(
+    q: str = Query(..., min_length=2, description="Search text"),
+    limit: int = Query(10, ge=1, le=50)
 ):
-    """Find POIs within a given radius of the provided coordinates."""
-    df = load_data()
+    session = SessionLocal()
 
-    # Filter by category if provided
-    if category:
-        df = df[df["category"].str.contains(category.lower(), na=False)]
+    sql = """
+    SELECT
+        id,
+        title,
+        category,
+        city,
+        rating
+    FROM poi
+    WHERE normalized_title ILIKE :q
+    ORDER BY rating DESC NULLS LAST
+    LIMIT :limit;
+    """
 
-    # Convert lat/lon columns to numeric
-    df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
-    df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
-    df = df.dropna(subset=["lat", "lon"])
+    result = session.execute(
+        text(sql),
+        {
+            "q": f"%{q.lower()}%",
+            "limit": limit
+        }
+    ).fetchall()
 
-    # Haversine formula to calculate distance (km)
-    def haversine(lat1, lon1, lat2, lon2):
-        R = 6371  # Earth radius in km
-        dlat = radians(lat2 - lat1)
-        dlon = radians(lon2 - lon1)
-        a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
-        c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return R * c
+    session.close()
 
-    df["distance_km"] = df.apply(lambda row: haversine(lat, lon, row["lat"], row["lon"]), axis=1)
-
-    nearby = df[df["distance_km"] <= radius].sort_values(by="distance_km")
-
-    if nearby.empty:
-        return {"message": f"No POIs found within {radius} km."}
-
-    return nearby.head(30).to_dict(orient="records")
+    return [dict(row._mapping) for row in result]
