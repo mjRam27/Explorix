@@ -20,7 +20,7 @@ from services.connect_service import router as connect_router
 from services.profile_service import router as profile_router
 from routes.search import router as search_router
 from services import pois, geo_features
-
+from routes.explorix_chat import router as explorix_router
 
 
 app = FastAPI()
@@ -49,6 +49,7 @@ app.include_router(profile_router)
 app.include_router(search_router)
 app.include_router(pois.router)
 app.include_router(geo_features.router)
+app.include_router(explorix_router)
 
 @app.on_event("startup")
 async def startup_event():

@@ -9,13 +9,7 @@ class ChatRequest(BaseModel):
 
 @router.post("/explorix/chat")
 def chat(req: ChatRequest):
-    prompt = f"""### User:
-{req.question}
-
-### Assistant:"""
-
-    answer = generate_explorix_response(prompt)
-
+    answer = generate_explorix_response(req.question)
     return {
         "response": answer
     }
