@@ -25,3 +25,6 @@ google_credentials.json
 # Redis
 dump.rdb
 appendonly.aof
+
+model/explorix-lora/*.safetensors
+model/explorix-lora/*.bin
