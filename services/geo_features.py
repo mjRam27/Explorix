@@ -1,18 +1,19 @@
-from fastapi import APIRouter, Query
-from utils.postgres import SessionLocal
+# app/places/geo_routes.py
+from fastapi import APIRouter, Query, Depends
 from sqlalchemy.sql import text
+from sqlalchemy.ext.asyncio import AsyncSession
+from db.postgres import get_db
 
 router = APIRouter(prefix="/geo", tags=["Geo Features"])
 
 @router.get("/nearby")
-def nearby_features(
+async def nearby_features(
     lat: float,
     lon: float,
     radius_km: int = 5,
     category: str | None = None,
+    db: AsyncSession = Depends(get_db),
 ):
-    session = SessionLocal()
-
     sql = """
     SELECT
         COALESCE(
@@ -47,8 +48,7 @@ def nearby_features(
 
     sql += " ORDER BY distance_km LIMIT 20;"
 
-    result = session.execute(text(sql), params).fetchall()
-    session.close()
+    result = await db.execute(text(sql), params)
+    rows = result.fetchall()
 
-    return [dict(row._mapping) for row in result]
-
+    return [dict(row._mapping) for row in rows]
