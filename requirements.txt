@@ -1,9 +1,21 @@
+# Core API
 fastapi
 uvicorn[standard]
 requests
+python-dotenv
+
+# Database - PostgreSQL
+sqlalchemy>=2.0
+asyncpg
+
+# Database - MongoDB
 pymongo[srv]
 dnspython
-python-dotenv
-redis
-# neo4j
 
+# Cache
+redis
+
+# Authentication & Security
+python-jose[cryptography]
+passlib[bcrypt]
+cryptography

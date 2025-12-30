@@ -1,0 +1,7 @@
+# LLM / RAG
+torch
+transformers
+sentence-transformers
+faiss-cpu
+numpy
+scipy
