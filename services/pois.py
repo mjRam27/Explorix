@@ -1,22 +1,19 @@
-from fastapi import APIRouter, Query, HTTPException
-from utils.postgres import SessionLocal
+# app/places/poi_routes.py
+from fastapi import APIRouter, Query, HTTPException, Depends
 from sqlalchemy.sql import text
+from sqlalchemy.ext.asyncio import AsyncSession
+from db.postgres import get_db
 
 router = APIRouter(prefix="/pois", tags=["POIs"])
 
-
-# ---------------------------------------------------------
-# GET /pois → List POIs with filters
-# ---------------------------------------------------------
 @router.get("/")
-def get_pois(
-    category: str | None = Query(None, description="Filter by category"),
-    city: str | None = Query(None, description="Filter by city"),
-    poi_type: str | None = Query(None, description="Filter by POI type (stay, food, attraction)"),
-    limit: int = Query(20, ge=1, le=100)
+async def get_pois(
+    category: str | None = Query(None),
+    city: str | None = Query(None),
+    poi_type: str | None = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
 ):
-    session = SessionLocal()
-
     sql = """
     SELECT
         id,
@@ -51,95 +48,10 @@ def get_pois(
     """
     params["limit"] = limit
 
-    result = session.execute(text(sql), params).fetchall()
-    session.close()
+    result = await db.execute(text(sql), params)
+    rows = result.fetchall()
 
-    if not result:
+    if not rows:
         return {"message": "No POIs found"}
 
-    return [dict(row._mapping) for row in result]
-
-
-# ---------------------------------------------------------
-# GET /pois/categories → List available categories
-# ---------------------------------------------------------
-@router.get("/categories")
-def list_categories():
-    session = SessionLocal()
-
-    sql = """
-    SELECT DISTINCT category
-    FROM poi
-    WHERE category IS NOT NULL
-    ORDER BY category;
-    """
-
-    result = session.execute(text(sql)).fetchall()
-    session.close()
-
-    return {
-        "categories": [row[0] for row in result],
-        "count": len(result)
-    }
-
-
-# ---------------------------------------------------------
-# GET /pois/{poi_id} → POI detail
-# ---------------------------------------------------------
-@router.get("/{poi_id}")
-def get_poi_detail(poi_id: int):
-    session = SessionLocal()
-
-    sql = """
-    SELECT *
-    FROM poi
-    WHERE id = :poi_id
-    """
-
-    result = session.execute(
-        text(sql),
-        {"poi_id": poi_id}
-    ).fetchone()
-
-    session.close()
-
-    if not result:
-        raise HTTPException(status_code=404, detail="POI not found")
-
-    return dict(result._mapping)
-
-
-# ---------------------------------------------------------
-# GET /pois/search → Text search (fast, explainable)
-# ---------------------------------------------------------
-@router.get("/search")
-def search_poi(
-    q: str = Query(..., min_length=2, description="Search text"),
-    limit: int = Query(10, ge=1, le=50)
-):
-    session = SessionLocal()
-
-    sql = """
-    SELECT
-        id,
-        title,
-        category,
-        city,
-        rating
-    FROM poi
-    WHERE normalized_title ILIKE :q
-    ORDER BY rating DESC NULLS LAST
-    LIMIT :limit;
-    """
-
-    result = session.execute(
-        text(sql),
-        {
-            "q": f"%{q.lower()}%",
-            "limit": limit
-        }
-    ).fetchall()
-
-    session.close()
-
-    return [dict(row._mapping) for row in result]
+    return [dict(row._mapping) for row in rows]
