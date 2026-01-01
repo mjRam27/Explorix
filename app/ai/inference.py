@@ -14,7 +14,12 @@ def build_chat_prompt(messages):
     return prompt
 
 
-def generate_explorix_response(question: str):
+def generate_explorix_response(
+    question: str,
+    history: list | None = None
+):
+    history = history or []
+
     messages = [
         {
             "role": "system",
@@ -27,12 +32,21 @@ def generate_explorix_response(question: str):
                 "If information is missing or uncertain, clearly explain the limitation without guessing.\n"
                 "Do not claim to be ChatGPT or any other assistant."
             )
-        },
-        {
-            "role": "user",
-            "content": question
         }
     ]
+
+    # 🔹 Inject conversation history
+    for msg in history:
+        messages.append({
+            "role": msg["role"],
+            "content": msg["content"]
+        })
+
+    # 🔹 Current user question
+    messages.append({
+        "role": "user",
+        "content": question
+    })
 
     prompt = build_chat_prompt(messages)
 
@@ -52,8 +66,4 @@ def generate_explorix_response(question: str):
 
     decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-    print("MODEL DEVICE:", model.device)
-    print("FULL DECODED OUTPUT:\n", decoded)
-
-    # ✅ FIXED LINE
     return decoded.split("### Assistant:")[-1].strip()
