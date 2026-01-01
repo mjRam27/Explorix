@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import uuid4
 from app.db.db_mongo import conversations
 
-MAX_HISTORY = 6  # last N messages sent to model
+MAX_HISTORY = 6
 
 
 def create_conversation(user_id: str) -> str:
