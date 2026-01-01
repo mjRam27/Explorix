@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile, Form, Query
-from app.social.service import (
+from social.service import (
     find_nearby_users,
     upload_post,
     get_posts

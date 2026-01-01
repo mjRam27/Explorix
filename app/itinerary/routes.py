@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Body
-from app.itinerary.service import (
+from itinerary.service import (
     add_itinerary,
     get_user_itineraries
 )

@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Query, HTTPException, Depends
 from sqlalchemy.sql import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.postgres import get_db
+from app.db.postgres import get_db
 
 router = APIRouter(prefix="/pois", tags=["POIs"])
 

@@ -1,5 +1,5 @@
 import requests
-from utils.db_redis import get_cached_departure, cache_departure, redis_client
+from db.db_redis import get_cached_departure, cache_departure, redis_client
 
 # Station IDs you want to cache
 CACHED_STATIONS = {"900100003", "900100026"}

@@ -1,5 +1,5 @@
 import torch
-from model.model_loader import load_explorix_model
+from ai.model_loader import load_explorix_model
 
 model, tokenizer = load_explorix_model()
 

@@ -1,7 +1,7 @@
 # app/chat/routes.py
 from fastapi import APIRouter
 from pydantic import BaseModel
-from app.ai.inference import generate_explorix_response
+from ai.inference import generate_explorix_response
 
 router = APIRouter(prefix="/explorix", tags=["Chat"])
 

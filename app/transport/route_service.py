@@ -1,5 +1,5 @@
 # services/route_service.py
-from utils.db_neo4j import get_neo4j_session
+from db.db_neo4j import get_neo4j_session
 
 def find_shortest_route(start_station_name: str, end_station_name: str):
     """

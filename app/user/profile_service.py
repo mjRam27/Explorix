@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Body
-from utils.db_mongo import db
+from app.db.db_mongo import db
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
 users = db["users"]

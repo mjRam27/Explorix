@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Query
 from bson import ObjectId
 
-from app.history.service import (
+from history.service import (
     log_user_journey,
     get_user_history
 )

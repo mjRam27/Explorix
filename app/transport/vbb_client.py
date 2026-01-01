@@ -1,6 +1,6 @@
 import requests
 from datetime import datetime
-from utils.db_mongo import log_trip
+from app.db.db_mongo import log_trip
 from bson import ObjectId
 
 # from utils.db_neo4j import create_route  # Neo4j disabled
