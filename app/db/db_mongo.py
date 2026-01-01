@@ -8,7 +8,8 @@ load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
 client = MongoClient(MONGO_URI)
 
-db = client["vbb_db"]   # keep consistent name
+db = client["Explorix"]
+# keep consistent name
 
 # -------- Collections --------
 station_logs = db["station_logs"]
@@ -17,6 +18,7 @@ journey_logs = db["journey_logs"]
 posts = db["posts"]
 itineraries = db["itineraries"]
 users = db["users"]
+conversations = db["conversations"]
 
 # -------- Generic helpers --------
 def log_trip(data: dict, collection_name: str):
