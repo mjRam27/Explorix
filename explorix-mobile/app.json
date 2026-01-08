@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Explorix",
+    "slug": "explorix",
+    "scheme": "explorix",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "plugins": [
+      "expo-router"
+    ],
+    "android": {
+      "package": "com.anonymous.explorix"
+    }
+  }
+}
