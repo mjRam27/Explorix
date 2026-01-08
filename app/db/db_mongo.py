@@ -25,10 +25,15 @@ def log_trip(data: dict, collection_name: str):
     db[collection_name].insert_one(data)
 
 # -------- Transport helpers --------
-def get_station_logs():
-    return list(
-        station_logs.find(
-            {},
-            {"_id": 0, "station_id": 1, "name": 1}
-        )
-    )
+def get_station_logs(filter_query=None, limit=10):
+    query = filter_query or {}
+
+    docs = station_logs.find(
+        query,
+        {"_id": 0, "station_id": 1, "name": 1}
+    ).limit(limit)
+
+    return [
+        {"id": d["station_id"], "name": d["name"]}
+        for d in docs
+    ]

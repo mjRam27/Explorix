@@ -1,3 +1,4 @@
+# transport/station_suggestions.py
 from fastapi import APIRouter, Query
 from typing import List
 from pymongo.collection import Collection
@@ -16,9 +17,11 @@ router = APIRouter()
 
 @router.get("/stations/suggest")
 def suggest_stations(q: str = Query(..., min_length=1)) -> List[dict]:
-    regex_query = {"$regex": f"^{q}", "$options": "i"}
-    result = station_collection.find(
-        {"name": regex_query},
-        {"_id": 0, "id": 1, "name": 1}
-    ).limit(10)
-    return list(result)
+    regex_query = {
+        "name": {
+            "$regex": f"^{q}",
+            "$options": "i"
+        }
+    }
+    return get_station_logs(regex_query)
+
