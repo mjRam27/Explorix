@@ -1,10 +1,13 @@
+# chat/service.py
+
 from datetime import datetime
 from uuid import uuid4
-from typing import List, Dict
+from typing import List, Dict, Optional
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.db_mongo import conversations
 from places.poi_service import get_pois_by_city
-from sqlalchemy.ext.asyncio import AsyncSession
 
 MAX_HISTORY = 6
 
@@ -54,7 +57,8 @@ def get_conversation_history(conversation_id: str) -> List[Dict]:
 
 KNOWN_CITIES = ["Berlin", "Munich", "Hamburg", "Frankfurt"]
 
-def extract_city(text: str) -> str | None:
+
+def extract_city(text: str) -> Optional[str]:
     for city in KNOWN_CITIES:
         if city.lower() in text.lower():
             return city
@@ -63,10 +67,10 @@ def extract_city(text: str) -> str | None:
 
 async def build_poi_context(
     db: AsyncSession,
-    question: str,
+    message: str,
     limit: int = 5
 ) -> str:
-    city = extract_city(question)
+    city = extract_city(message)
     if not city:
         return ""
 
@@ -81,6 +85,7 @@ async def build_poi_context(
 
     poi_context = f"Known places in {city}:\n" + "\n".join(lines)
 
+    # Debug visibility (remove later)
     print("POI CONTEXT:\n", poi_context)
 
     return poi_context
@@ -93,33 +98,34 @@ async def build_poi_context(
 async def build_messages_for_llm(
     db: AsyncSession,
     conversation_id: str,
-    question: str
+    message: str,
+    location: Optional[dict] = None
 ) -> List[Dict]:
     """
     Builds the final message list sent to the LLM:
-    1. POI system context (if available)
+    1. POI system context (Postgres, conditional)
     2. Conversation history (MongoDB)
-    3. Current user question
+    3. Current user message
     """
 
     messages: List[Dict] = []
 
-    # RAG: inject POI context
-    poi_context = await build_poi_context(db, question)
+    # 1. RAG: inject POI context (city-based for now)
+    poi_context = await build_poi_context(db, message)
     if poi_context:
         messages.append({
             "role": "system",
             "content": poi_context
         })
 
-    # Conversation memory
+    # 2. Conversation memory (MongoDB)
     history = get_conversation_history(conversation_id)
     messages.extend(history)
 
-    # Current user input
+    # 3. Current user input
     messages.append({
         "role": "user",
-        "content": question
+        "content": message
     })
 
     return messages

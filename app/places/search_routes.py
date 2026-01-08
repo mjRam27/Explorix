@@ -1,6 +1,6 @@
-# app/places/poi_routes.py
+# app/places/search_routes.py
 from fastapi import APIRouter, Query
-from places.poi_service import search_location
+from places.location_service import search_location
 
 router = APIRouter(prefix="/search", tags=["Search"])
 

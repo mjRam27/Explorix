@@ -1,3 +1,5 @@
+# chat/routes.py
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +20,13 @@ async def chat(
     req: ChatRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    # TEMP until auth is added
+    """
+    Main chat endpoint for Explorix.
+    - MongoDB: conversation memory
+    - Postgres: conditional RAG (POIs / geo / transport)
+    """
+
+    # TODO: replace with real user_id from JWT auth
     user_id = "demo_user"
 
     # 1. Conversation handling
@@ -27,21 +35,29 @@ async def chat(
     else:
         conversation_id = req.conversation_id
 
-    # 2. Build RAG-aware messages (THIS WAS MISSING)
+    # 2. Build messages for LLM (history + optional RAG context)
     messages = await build_messages_for_llm(
         db=db,
         conversation_id=conversation_id,
-        question=req.question
+        message=req.message,
+        location=req.location
     )
 
-    # 3. AI response
+    # Safety fallback (should rarely trigger)
+    if not messages:
+        messages = [
+            {"role": "user", "content": req.message}
+        ]
+
+    # 3. Generate AI response
     answer = generate_explorix_response(messages)
 
-    # 4. Persist messages
-    append_message(conversation_id, "user", req.question)
+    # 4. Persist conversation (MongoDB)
+    append_message(conversation_id, "user", req.message)
     append_message(conversation_id, "assistant", answer)
 
-    return {
-        "conversation_id": conversation_id,
-        "response": answer
-    }
+    # 5. Return response
+    return ChatResponse(
+        conversation_id=conversation_id,
+        response=answer
+    )
