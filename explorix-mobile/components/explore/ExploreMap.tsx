@@ -6,26 +6,37 @@ import { Place } from "./types";
 type Props = {
   region: Region;
   places: Place[];
+  sheetExpanded: boolean;
   onMarkerPress: (place: Place) => void;
 };
 
-export default function ExploreMap({ region, places, onMarkerPress }: Props) {
+export default function ExploreMap({
+  region,
+  places,
+  sheetExpanded,
+  onMarkerPress,
+}: Props) {
   return (
     <View style={{ flex: 1 }}>
-
-      <MapView style={StyleSheet.absoluteFill} region={region}>
+      <MapView
+        style={StyleSheet.absoluteFill}
+        region={region}
+        scrollEnabled={!sheetExpanded}
+        zoomEnabled={!sheetExpanded}
+        rotateEnabled={!sheetExpanded}
+        pitchEnabled={!sheetExpanded}
+      >
         {places.map((p) => (
-<Marker
-  key={p.id}
-  coordinate={{
-    latitude: p.latitude,
-    longitude: p.longitude,
-  }}
-  title={p.title}
-  description={`${p.distance_km.toFixed(2)} km away`}
-  onPress={() => onMarkerPress(p)}
-/>
-
+          <Marker
+            key={p.id}
+            coordinate={{
+              latitude: p.latitude,
+              longitude: p.longitude,
+            }}
+            title={p.title}
+            description={`${p.distance_km.toFixed(2)} km away`}
+            onPress={() => onMarkerPress(p)}
+          />
         ))}
       </MapView>
     </View>

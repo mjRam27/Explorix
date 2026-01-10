@@ -25,7 +25,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 9,
   },
 
   inputBox: {
@@ -34,8 +34,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#fff",
 
-    height: 45,                // 👈 makes it tall
-    paddingHorizontal: 16,     // 👈 spacious feel
+    height: 44,                // 👈 makes it tall
+    paddingHorizontal: 19,     // 👈 spacious feel
     borderRadius: 26,          // 👈 pill shape
 
     shadowColor: "#000",       // 👇 shadow = premium
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
   button: {
     height: 45,                // 👈 match input height
     backgroundColor: "#0f9d58",
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     borderRadius: 26,
     justifyContent: "center",
 

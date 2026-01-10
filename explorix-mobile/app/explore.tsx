@@ -1,4 +1,5 @@
-import { View, StyleSheet, Keyboard, TouchableWithoutFeedback } from "react-native";
+// app/explore.tsx
+import { View, StyleSheet, Keyboard } from "react-native";
 import { useEffect, useState } from "react";
 import ExploreMap from "../components/explore/ExploreMap";
 import PlaceSheet from "../components/explore/PlaceSheet";
@@ -23,15 +24,16 @@ const CATEGORY_GROUPS: Category[] = [
   { key: "shopping", label: "Shopping", icon: "cart" },
 ];
 
-
 export default function ExploreScreen() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [searchText, setSearchText] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
-
   const [category, setCategory] = useState("all");
   const [radiusKm, setRadiusKm] = useState(5);
   const [showRadius, setShowRadius] = useState(false);
+
+  // ✅ THIS MUST BE HERE
+  const [sheetExpanded, setSheetExpanded] = useState(false);
 
   const [region, setRegion] = useState({
     latitude: 49.48,
@@ -46,71 +48,64 @@ export default function ExploreScreen() {
     ).then(setPlaces);
   }, [region.latitude, region.longitude]);
 
-  const filteredPlaces = places.filter((p) => {
-    const matchesSearch =
-      !activeSearch ||
-      p.title.toLowerCase().includes(activeSearch.toLowerCase());
-
-    // category logic later (group mapping)
-    return matchesSearch;
-  });
+  const filteredPlaces = places.filter((p) =>
+    !activeSearch
+      ? true
+      : p.title.toLowerCase().includes(activeSearch.toLowerCase())
+  );
 
   return (
-    <TouchableWithoutFeedback
-      onPress={() => {
-        Keyboard.dismiss();
-        setShowRadius(false);
-      }}
-      accessible={false}
-    >
-      <View style={styles.container}>
-        {/* MAP */}
-        <ExploreMap
-          region={region}
-          places={filteredPlaces}
-          onMarkerPress={() => {}}
+    <View style={styles.container}>
+      {/* MAP */}
+      <ExploreMap
+        region={region}
+        places={filteredPlaces}
+        sheetExpanded={sheetExpanded}
+        onMarkerPress={() => {}}
+      />
+
+      {/* SEARCH + FILTER */}
+      <View style={styles.searchOverlay}>
+        <SearchBar
+          value={searchText}
+          onChange={setSearchText}
+          onSearch={() => {
+            Keyboard.dismiss();
+            setActiveSearch(searchText);
+            setShowRadius(false);
+          }}
         />
 
-        {/* SEARCH + FILTER OVERLAY */}
-        <View style={styles.searchOverlay}>
-          <SearchBar
-            value={searchText}
-            onChange={setSearchText}
-            onSearch={() => {
-              Keyboard.dismiss();
-              setActiveSearch(searchText);
-              setShowRadius(false);
-            }}
+        <FilterBar
+          categories={CATEGORY_GROUPS}
+          activeCategory={category}
+          radiusKm={radiusKm}
+          onSelectCategory={(key) => {
+            setCategory(key);
+            setShowRadius(false);
+          }}
+          onPressRadius={() => {
+            Keyboard.dismiss();
+            setShowRadius((v) => !v);
+          }}
+        />
+
+        {showRadius && (
+          <RadiusSlider
+            visible={showRadius}
+            value={radiusKm}
+            onChange={setRadiusKm}
           />
-
-          <FilterBar
-            categories={CATEGORY_GROUPS}
-            activeCategory={category}
-            radiusKm={radiusKm}
-            onSelectCategory={(key) => {
-              setCategory(key);
-              setShowRadius(false);
-            }}
-            onPressRadius={() => {
-              Keyboard.dismiss();
-              setShowRadius((v) => !v);
-            }}
-          />
-
-          {showRadius && (
-        <RadiusSlider
-  visible={showRadius}
-  value={radiusKm}
-  onChange={setRadiusKm}
-/>
-
-          )}
-        </View>
-
-        {/* PLACE SHEET */}
-        <PlaceSheet places={filteredPlaces} />
+        )}
       </View>
-    </TouchableWithoutFeedback>
+
+      {/* BOTTOM SHEET */}
+      <PlaceSheet
+        places={filteredPlaces}
+        onExpand={() => setSheetExpanded(true)}
+        onCollapse={() => setSheetExpanded(false)}
+      />
+    </View>
   );
 }
 

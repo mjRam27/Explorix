@@ -36,7 +36,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     elevation: 2,
-    zIndex: 10,
   },
   title: {
     fontWeight: "600",
