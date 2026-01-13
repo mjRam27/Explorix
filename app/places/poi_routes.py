@@ -1,9 +1,9 @@
-# app/places/poi_routes.py
+# places/poi_routes.py
 from fastapi import APIRouter, Query, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.postgres import get_db
-from places.poi_service import get_pois_by_city
 from sqlalchemy.sql import text
+from db.postgres import get_db
+from core.dependencies import get_current_user
 
 router = APIRouter(prefix="/pois", tags=["POIs"])
 
@@ -14,6 +14,7 @@ async def get_pois(
     poi_type: str | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),  # 🔒 AUTH
 ):
     sql = """
     SELECT

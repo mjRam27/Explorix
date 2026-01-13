@@ -1,10 +1,12 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-
+from uuid import UUID
 
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
+    name: str | None = None
+    country_code: str | None = None
 
 
 class UserLogin(BaseModel):
@@ -18,6 +20,6 @@ class TokenResponse(BaseModel):
 
 
 class UserPublic(BaseModel):
-    user_id: str
+    user_id: UUID
     email: EmailStr
     created_at: datetime
