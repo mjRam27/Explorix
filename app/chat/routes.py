@@ -1,16 +1,16 @@
 # chat/routes.py
-
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from schemas.chat import ChatRequest, ChatResponse
-from ai.inference import generate_explorix_response
+from ai.llama_client import generate_from_llama
 from chat.service import (
     create_conversation,
     append_message,
     build_messages_for_llm
 )
 from db.postgres import get_db
+from utils.translation import translate_back
 
 router = APIRouter(prefix="/explorix", tags=["Chat"])
 
@@ -21,12 +21,13 @@ async def chat(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Main chat endpoint for Explorix.
-    - MongoDB: conversation memory
-    - Postgres: conditional RAG (POIs / geo / transport)
+    Multilingual Explorix Chat:
+    - Auto language detection
+    - Translate → English → LLM → Translate back
+    - RAG grounded strictly in DB
     """
 
-    # TODO: replace with real user_id from JWT auth
+    # TODO: replace with JWT user_id later
     user_id = "demo_user"
 
     # 1. Conversation handling
@@ -35,29 +36,25 @@ async def chat(
     else:
         conversation_id = req.conversation_id
 
-    # 2. Build messages for LLM (history + optional RAG context)
-    messages = await build_messages_for_llm(
+    # 2. Build messages (translated → EN)
+    messages, user_lang = await build_messages_for_llm(
         db=db,
         conversation_id=conversation_id,
-        message=req.message,
+        user_message=req.message,
         location=req.location
     )
 
-    # Safety fallback (should rarely trigger)
-    if not messages:
-        messages = [
-            {"role": "user", "content": req.message}
-        ]
+    # 3. Generate response from LLM (EN)
+    answer_en = await generate_from_llama(messages)
 
-    # 3. Generate AI response
-    answer = generate_explorix_response(messages)
+    # 4. Translate back to user language (if needed)
+    final_answer = translate_back(answer_en, user_lang)
 
-    # 4. Persist conversation (MongoDB)
+    # 5. Persist conversation (store original language)
     append_message(conversation_id, "user", req.message)
-    append_message(conversation_id, "assistant", answer)
+    append_message(conversation_id, "assistant", final_answer)
 
-    # 5. Return response
     return ChatResponse(
         conversation_id=conversation_id,
-        response=answer
+        response=final_answer
     )

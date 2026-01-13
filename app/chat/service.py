@@ -1,19 +1,25 @@
 # chat/service.py
-
 from datetime import datetime
 from uuid import uuid4
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
+import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from schemas.chat import Location
 from db.db_mongo import conversations
-from places.poi_service import get_pois_by_city
+from places.poi_service import get_pois_by_city, get_pois_near_location
+from utils.translation import (
+    maybe_translate_to_english,
+    translate_back
+)
+
 
 MAX_HISTORY = 6
 
-# ----------------------------
+# ============================
 # Conversation (MongoDB)
-# ----------------------------
+# ============================
 
 def create_conversation(user_id: str) -> str:
     conversation_id = str(uuid4())
@@ -51,26 +57,40 @@ def get_conversation_history(conversation_id: str) -> List[Dict]:
     return convo["messages"] if convo else []
 
 
-# ----------------------------
-# RAG helpers (Postgres)
-# ----------------------------
+# ============================
+# Helpers
+# ============================
 
-KNOWN_CITIES = ["Berlin", "Munich", "Hamburg", "Frankfurt"]
+KNOWN_CITIES = {
+    "berlin": "Berlin",
+    "munich": "Munich",
+    "münchen": "Munich",
+    "munchen": "Munich",
+    "hamburg": "Hamburg",
+    "frankfurt": "Frankfurt",
+}
 
 
 def extract_city(text: str) -> Optional[str]:
-    for city in KNOWN_CITIES:
-        if city.lower() in text.lower():
-            return city
+    text = text.lower()
+    for key, value in KNOWN_CITIES.items():
+        if key in text:
+            return value
     return None
 
 
-async def build_poi_context(
-    db: AsyncSession,
-    message: str,
-    limit: int = 5
-) -> str:
-    city = extract_city(message)
+
+def extract_radius_km(text: str) -> Optional[float]:
+    match = re.search(r'(\d+(?:\.\d+)?)\s*(km|kilometer|kilometers)', text.lower())
+    return float(match.group(1)) if match else None
+
+
+# ============================
+# RAG builders
+# ============================
+
+async def build_city_rag(db: AsyncSession, message_en: str, limit: int = 5) -> str:
+    city = extract_city(message_en)
     if not city:
         return ""
 
@@ -78,54 +98,101 @@ async def build_poi_context(
     if not pois:
         return ""
 
+    lines = [f"- {p['title']} ({p.get('category', 'place')})" for p in pois]
+    return (
+        f"Retrieved places from database for {city}:\n"
+        + "\n".join(lines)
+    )
+
+
+async def build_location_rag(
+    db: AsyncSession,
+    location: Location,
+    message_en: str,
+    limit: int = 5
+) -> str:
+    radius_km = extract_radius_km(message_en) or 2.0
+    radius_km = min(max(radius_km, 0.5), 20.0)
+
+    pois = await get_pois_near_location(
+        db=db,
+        lat=location.lat,
+        lng=location.lng,
+        radius_km=radius_km,
+        limit=limit
+    )
+
+    if not pois:
+        return ""
+
     lines = [
-        f"- {p['title']} ({p.get('category', 'place')})"
+        f"- {p['title']} ({p.get('category', 'place')}, {p.get('distance_km')} km)"
         for p in pois
     ]
 
-    poi_context = f"Known places in {city}:\n" + "\n".join(lines)
-
-    # Debug visibility (remove later)
-    print("POI CONTEXT:\n", poi_context)
-
-    return poi_context
+    return (
+        "Retrieved nearby places from database:\n"
+        + "\n".join(lines)
+    )
 
 
-# ----------------------------
-# Prompt assembly (used by route)
-# ----------------------------
+# ============================
+# Prompt assembly + Translation
+# ============================
 
 async def build_messages_for_llm(
     db: AsyncSession,
     conversation_id: str,
-    message: str,
-    location: Optional[dict] = None
-) -> List[Dict]:
+    user_message: str,
+    location: Optional[Location] = None
+) -> Tuple[List[Dict], str]:
     """
-    Builds the final message list sent to the LLM:
-    1. POI system context (Postgres, conditional)
-    2. Conversation history (MongoDB)
-    3. Current user message
+    Returns:
+      messages_for_llm (ENGLISH)
+      detected_user_language
     """
 
-    messages: List[Dict] = []
+    # 🔁 Detect + translate input if needed
+    message_en, user_lang = maybe_translate_to_english(user_message)
 
-    # 1. RAG: inject POI context (city-based for now)
-    poi_context = await build_poi_context(db, message)
-    if poi_context:
-        messages.append({
+    messages: List[Dict] = [
+        {
             "role": "system",
-            "content": poi_context
-        })
+            "content": (
+                "You are Explorix AI, a travel and exploration assistant.\n"
+                "Use ONLY places provided from the database.\n"
+                "Do NOT invent places.\n"
+                "If no places are available, clearly say so."
+            )
+        }
+    ]
 
-    # 2. Conversation memory (MongoDB)
+    # 🔴 Location-based RAG
+    if location:
+        loc_context = await build_location_rag(db, location, message_en)
+        if loc_context:
+            messages.append({
+                "role": "system",
+                "content": loc_context
+            })
+
+    # 🟡 City-based RAG fallback
+    else:
+        city_context = await build_city_rag(db, message_en)
+        if city_context:
+            messages.append({
+                "role": "system",
+                "content": city_context
+            })
+
+    # 🧠 Conversation history (original language)
     history = get_conversation_history(conversation_id)
     messages.extend(history)
 
-    # 3. Current user input
+    # 👤 User input (ENGLISH to LLM)
     messages.append({
         "role": "user",
-        "content": message
+        "content": message_en
     })
 
-    return messages
+    return messages, user_lang
