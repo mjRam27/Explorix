@@ -1,3 +1,4 @@
+# places/search_routes.py
 from fastapi import APIRouter, Query, Depends
 from places.location_service import search_location
 from core.dependencies import get_current_user

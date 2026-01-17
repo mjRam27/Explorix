@@ -1,3 +1,4 @@
+# core/security.py
 from datetime import datetime, timedelta
 from jose import jwt
 from core.config import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRE_MINUTES

@@ -1,12 +1,12 @@
-# utils/translation.py
 from typing import Tuple
 from pathlib import Path
+import re
 from google.oauth2 import service_account
 
 # =========================
 # 🔒 SINGLE DEMO TOGGLE
 # =========================
-ENABLE_TRANSLATION = True   # <-- ONLY toggle this for demo
+ENABLE_TRANSLATION = False   # <-- ONLY toggle this for demo
 
 # =========================
 # CONFIG
@@ -14,18 +14,45 @@ ENABLE_TRANSLATION = True   # <-- ONLY toggle this for demo
 PROJECT_ID = "explorix032527"
 LOCATION = "global"
 
-# 🔥 ABSOLUTE, SAFE PATH
 BASE_DIR = Path(__file__).resolve().parent.parent
 SERVICE_ACCOUNT_FILE = BASE_DIR / "secrets" / "gcp-service-account.json"
 
 _client = None
 
 
+# =========================
+# ENGLISH HEURISTICS
+# =========================
+
+ENGLISH_HINT_WORDS = {
+    "the", "is", "are", "was", "were",
+    "who", "what", "where", "how", "why",
+    "built", "created", "show", "near",
+    "places", "me", "you", "your", "in", "on"
+}
+
+
+def looks_like_english(text: str) -> bool:
+    """
+    Deterministic English detection for short queries.
+    Prevents false Hindi detection for English names/questions.
+    """
+    text = text.strip()
+    text_l = text.lower()
+
+    # Must be ASCII-like
+    if not re.fullmatch(r"[A-Za-z0-9\s\?\.\,\-']+", text):
+        return False
+
+    tokens = set(text_l.split())
+    return bool(tokens & ENGLISH_HINT_WORDS)
+
+
+# =========================
+# CLIENT
+# =========================
+
 def _get_client():
-    """
-    Lazily create Google Translate client.
-    Will NOT crash app startup.
-    """
     global _client
 
     if not ENABLE_TRANSLATION:
@@ -50,6 +77,10 @@ def _get_client():
     return _client
 
 
+# =========================
+# TRANSLATION LOGIC
+# =========================
+
 def maybe_translate_to_english(text: str) -> Tuple[str, str]:
     """
     Returns:
@@ -58,6 +89,10 @@ def maybe_translate_to_english(text: str) -> Tuple[str, str]:
 
     if not ENABLE_TRANSLATION:
         return text, "unknown"
+
+    # ✅ HARD RULE: If it clearly looks like English, trust it
+    if looks_like_english(text):
+        return text, "en"
 
     client = _get_client()
 
@@ -68,11 +103,10 @@ def maybe_translate_to_english(text: str) -> Tuple[str, str]:
     )
 
     lang = response.languages[0].language_code
-
     print(f"[TRANSLATION] Detected language: {lang}")
 
     if lang == "en":
-        return text, lang
+        return text, "en"
 
     translated = client.translate_text(
         parent=f"projects/{PROJECT_ID}/locations/{LOCATION}",
@@ -86,7 +120,14 @@ def maybe_translate_to_english(text: str) -> Tuple[str, str]:
 
 
 def translate_back(text: str, target_lang: str) -> str:
-    if not ENABLE_TRANSLATION or target_lang in ("en", "unknown"):
+    """
+    Translate model output back to user language if required.
+    """
+
+    if not ENABLE_TRANSLATION:
+        return text
+
+    if not target_lang or target_lang in ("en", "unknown"):
         return text
 
     client = _get_client()

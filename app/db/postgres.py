@@ -2,27 +2,33 @@
 
 import os
 from typing import AsyncGenerator
-
 from dotenv import load_dotenv
+
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
     AsyncSession,
 )
+from sqlalchemy.orm import declarative_base
 
 # =====================================================
-# FORCE .env LOADING (ABSOLUTE PATH, NO GUESSING)
+# BASE (REQUIRED FOR MODELS)
 # =====================================================
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # -> app/
+Base = declarative_base()
+
+# =====================================================
+# FORCE .env LOADING
+# =====================================================
+
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # app/
 ENV_PATH = os.path.join(BASE_DIR, ".env")
 
 print(">>> LOADING ENV FROM:", ENV_PATH)
-
 load_dotenv(ENV_PATH)
 
 # =====================================================
-# DEBUG: SHOW EXACT VALUES (DO NOT REMOVE YET)
+# ENV VARIABLES
 # =====================================================
 
 POSTGRES_USER = os.getenv("POSTGRES_USER")
@@ -30,12 +36,6 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT")
 POSTGRES_DB = os.getenv("POSTGRES_DB")
-
-print(">>> POSTGRES_USER =", POSTGRES_USER)
-print(">>> POSTGRES_PASSWORD =", "***" if POSTGRES_PASSWORD else None)
-print(">>> POSTGRES_HOST =", POSTGRES_HOST)
-print(">>> POSTGRES_PORT =", POSTGRES_PORT)
-print(">>> POSTGRES_DB =", POSTGRES_DB)
 
 if not all([POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB]):
     raise RuntimeError("❌ Postgres environment variables are NOT loaded")
@@ -46,16 +46,11 @@ if not all([POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_PORT, POST
 
 DATABASE_URL = (
     f"postgresql+asyncpg://{POSTGRES_USER}:"
-    f"{POSTGRES_PASSWORD}@"
-    f"{POSTGRES_HOST}:"
-    f"{POSTGRES_PORT}/"
-    f"{POSTGRES_DB}"
+    f"{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 )
 
-print(">>> DATABASE_URL =", DATABASE_URL)
-
 # =====================================================
-# SQLALCHEMY ENGINE
+# ENGINE & SESSION
 # =====================================================
 
 engine = create_async_engine(
