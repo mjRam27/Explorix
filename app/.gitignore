@@ -63,3 +63,7 @@ merge_lora.py
 # Accidental version files
 # ===============================
 =*
+
+# Secrets
+app/secrets/
+*.json

@@ -1,3 +1,4 @@
+# itinerary/prompts.py
 def build_itinerary_prompt(req, duration: int) -> str:
     return f"""
 Create a {duration}-day travel itinerary for {req.destination}.

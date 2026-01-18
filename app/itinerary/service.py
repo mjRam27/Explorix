@@ -22,14 +22,15 @@ from itinerary.prompts import build_itinerary_prompt
 class ItineraryService:
 
     # =========================
-    # AI GENERATION
+    # AI GENERATION (SINGLE SOURCE OF TRUTH)
     # =========================
     async def generate_ai(
         self,
         db: AsyncSession,
         user_id: UUID,
-        req: ItineraryGenerateRequest
-    ) -> Itinerary:
+        req: ItineraryGenerateRequest,
+        persist: bool = True,   # 🔑 NEW
+    ):
 
         duration = (req.end_date - req.start_date).days + 1
 
@@ -40,6 +41,12 @@ class ItineraryService:
             limit=40
         )
 
+        if not places:
+            raise HTTPException(
+                status_code=400,
+                detail="No places found to generate itinerary"
+            )
+
         context = "\n".join(
             f"ID:{p.id} Title:{p.title} Category:{p.category}"
             for p in places
@@ -49,7 +56,7 @@ class ItineraryService:
 
         # ---- LLM ----
         prompt = build_itinerary_prompt(req, duration)
-        response = await llm_service.generate_response(prompt, context)
+        response = await llm_service.generate_json(prompt, context)
 
         try:
             data = json.loads(response.strip())
@@ -67,7 +74,21 @@ class ItineraryService:
                 if str(p["place_id"]) in places_map
             ]
 
-        # ---- Save itinerary ----
+        # =====================================================
+        # 🔁 PROPOSAL MODE (NO DB WRITE)
+        # =====================================================
+        if not persist:
+            return {
+                "title": data["title"],
+                "destination": req.destination,
+                "duration_days": duration,
+                "days": data["days"],
+                "tags": data.get("tags", []),
+            }
+
+        # =====================================================
+        # 💾 PERSIST MODE (UNCHANGED BEHAVIOR)
+        # =====================================================
         itinerary = Itinerary(
             user_id=user_id,
             title=data["title"],
@@ -101,7 +122,7 @@ class ItineraryService:
         return itinerary
 
     # =========================
-    # MANUAL CREATION
+    # MANUAL CREATION (UNCHANGED)
     # =========================
     async def create_manual(
         self,
@@ -133,7 +154,7 @@ class ItineraryService:
         return itinerary
 
     # =========================
-    # POI ENRICHMENT
+    # POI ENRICHMENT (UNCHANGED)
     # =========================
     async def _fetch_poi_map(
         self,
