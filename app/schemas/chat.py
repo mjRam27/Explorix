@@ -20,6 +20,11 @@ class ChatResponseType(str, Enum):
     ITINERARY_PROPOSAL = "ITINERARY_PROPOSAL"
 
 
+class ItineraryProposalMeta(BaseModel):
+    destination: str
+    suggested_days: int
+
+
 class ChatResponse(BaseModel):
     conversation_id: str
     response: str

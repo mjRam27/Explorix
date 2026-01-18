@@ -1,6 +1,12 @@
-# itinerary/prompts.py
+# app/itinerary/prompts.py
+
 def build_itinerary_prompt(req, duration: int) -> str:
     return f"""
+You MUST return ONLY valid JSON.
+No text before or after JSON.
+No explanations.
+No markdown.
+
 Create a {duration}-day travel itinerary for {req.destination}.
 
 PACE RULES:
@@ -9,12 +15,12 @@ PACE RULES:
 - fast: 5–6 places per day
 
 RULES:
-- Use ONLY places from the provided context
-- Return ONLY valid JSON
+- Use ONLY places from the provided CONTEXT
+- Do NOT invent place IDs
+- Keep days realistic
 - Respect pace: {req.pace}
-- Balance days realistically
 
-JSON FORMAT:
+JSON FORMAT (STRICT):
 {{
   "title": "Trip title",
   "description": "Short overview",
@@ -24,10 +30,10 @@ JSON FORMAT:
       "date": "YYYY-MM-DD",
       "places": [
         {{
-          "place_id": "uuid",
+          "place_id": 123,
           "order": 1,
           "duration_minutes": 120,
-          "notes": "Tips"
+          "notes": "Optional tips"
         }}
       ]
     }}

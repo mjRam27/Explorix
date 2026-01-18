@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
 from datetime import timedelta
-import json
+# import json
 
 from fastapi import HTTPException
 
@@ -15,8 +15,11 @@ from schemas.itinerary import (
 )
 from places.models import Place
 from rag.retriever import rag_retriever
-from rag.llm_service import llm_service
-from itinerary.prompts import build_itinerary_prompt
+# from rag.llm_service import llm_service
+# from itinerary.prompts import build_itinerary_prompt
+from itinerary.parser import parse_itinerary_text
+from schemas.itinerary_from_text import ItineraryFromTextRequest
+
 
 
 class ItineraryService:
@@ -121,6 +124,53 @@ class ItineraryService:
         await db.commit()
         return itinerary
 
+   # =====================================================
+    # TEXT → STRUCTURED ITINERARY (FROM CHAT)
+    # =====================================================
+    async def create_from_text(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        req: ItineraryFromTextRequest
+    ) -> Itinerary:
+
+        places = await rag_retriever.search_places(
+            db=db,
+            query=req.destination,
+            limit=40
+        )
+
+        if not places:
+            raise HTTPException(400, "No places found for destination")
+
+        days = parse_itinerary_text(
+            text=req.text_plan,
+            places=places,
+            start_date=req.start_date
+        )
+
+        if not days:
+            raise HTTPException(400, "Could not extract itinerary from text")
+
+        itinerary = Itinerary(
+            user_id=user_id,
+            title=f"{req.destination} Trip",
+            destination=req.destination,
+            start_date=req.start_date,
+            end_date=req.start_date + timedelta(days=len(days) - 1),
+            duration_days=len(days),
+            days=days,
+            ai_generated=True
+        )
+
+        db.add(itinerary)
+        await db.commit()
+        await db.refresh(itinerary)
+
+        return itinerary
+
+
+
     # =========================
     # MANUAL CREATION (UNCHANGED)
     # =========================
@@ -220,3 +270,4 @@ class ItineraryService:
             "duration_days": itinerary.duration_days,
             "days": enriched_days
         }
+ 
