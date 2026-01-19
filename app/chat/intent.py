@@ -1,44 +1,45 @@
+# chat/intent.py
+import re
 from enum import Enum
 
 
 class ChatIntent(str, Enum):
-    ITINERARY_REQUEST = "itinerary_request"
-    POI_SEARCH = "poi_search"
-    GENERAL_CHAT = "general_chat"
+    CHAT = "CHAT"
+    POI_SEARCH = "POI_SEARCH"
+    ITINERARY_REQUEST = "ITINERARY_REQUEST"
 
 
 def detect_intent(text: str) -> ChatIntent:
-    t = text.lower()
+    text = text.lower()
 
     itinerary_keywords = [
         "itinerary",
-        "plan my trip",
-        "plan a trip",
+        "plan",
+        "schedule",
+        "trip",
         "travel plan",
-        "day plan",
-        "2 day",
-        "3 day",
-        "4 day",
-        "days in",
+        "day trip"
     ]
 
     poi_keywords = [
-        "nearby",
-        "near me",
+        "restaurant",
+        "cafe",
+        "lake",
         "places",
-        "restaurants",
-        "cafes",
-        "bars",
-        "parks",
-        "lakes",
-        "things to do",
+        "nearby",
         "visit",
+        "things to do"
     ]
 
-    if any(k in t for k in itinerary_keywords):
+    if any(k in text for k in itinerary_keywords):
         return ChatIntent.ITINERARY_REQUEST
 
-    if any(k in t for k in poi_keywords):
+    if any(k in text for k in poi_keywords):
         return ChatIntent.POI_SEARCH
 
-    return ChatIntent.GENERAL_CHAT
+    return ChatIntent.CHAT
+
+
+def extract_days(text: str) -> int:
+    match = re.search(r"(\d+)\s*day", text.lower())
+    return int(match.group(1)) if match else 3

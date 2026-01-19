@@ -12,6 +12,7 @@ from db.postgres import get_db
 from utils.translation import translate_back
 from rag.llm_service import llm_service
 from rag.retriever import rag_retriever
+from chat.service import extract_city
 
 router = APIRouter(prefix="/explorix", tags=["Chat"])
 
@@ -90,6 +91,15 @@ async def chat(
 
     append_message(conversation_id, "user", req.message)
     append_message(conversation_id, "assistant", final_answer)
+    
+    destination = None
+    if intent == ChatIntent.ITINERARY_REQUEST:
+        destination = (
+            req.location.city
+            if req.location
+            else extract_city(req.message)
+        )
+
 
     return ChatResponse(
         conversation_id=conversation_id,
@@ -101,10 +111,12 @@ async def chat(
         ),
         itinerary_proposal=(
             {
-                "destination": req.location.city if req.location else None,
+                "destination": destination,
                 "status": "proposed",
                 "can_save": True
             }
-            if intent == ChatIntent.ITINERARY_REQUEST else None
+            if intent == ChatIntent.ITINERARY_REQUEST
+            else None
         )
+
     )
