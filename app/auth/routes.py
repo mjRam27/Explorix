@@ -1,3 +1,4 @@
+# auth/routes.py
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +19,10 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
         payload.name,
         payload.country_code,
     )
-    return {"access_token": token}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+    }
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -28,7 +32,10 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
         payload.email,
         payload.password,
     )
-    return {"access_token": token}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+    }
 
 
 @router.get("/me", response_model=UserPublic)

@@ -1,3 +1,4 @@
+# auth/models.py
 from sqlalchemy import Column, String, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
@@ -14,6 +15,8 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
 
-    is_active = Column(String, default=True)
+    name = Column(String(100), nullable=True)
+    country_code = Column(String(10), nullable=True)
 
+    is_active = Column(String, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

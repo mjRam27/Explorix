@@ -1,3 +1,4 @@
+# auth/schemas.py
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from uuid import UUID
@@ -23,3 +24,5 @@ class UserPublic(BaseModel):
     user_id: UUID
     email: EmailStr
     created_at: datetime
+
+

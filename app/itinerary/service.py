@@ -9,10 +9,8 @@ from datetime import timedelta
 from fastapi import HTTPException
 
 from itinerary.models import Itinerary, ItineraryPlace
-from schemas.itinerary import (
-    ItineraryGenerateRequest,
-    ItineraryCreateRequest
-)
+from schemas.itinerary import ItineraryCreateRequest
+
 from places.models import Place
 from rag.retriever import rag_retriever
 # from rag.llm_service import llm_service
@@ -27,102 +25,102 @@ class ItineraryService:
     # =========================
     # AI GENERATION (SINGLE SOURCE OF TRUTH)
     # =========================
-    async def generate_ai(
-        self,
-        db: AsyncSession,
-        user_id: UUID,
-        req: ItineraryGenerateRequest,
-        persist: bool = True,   # 🔑 NEW
-    ):
+    # async def generate_ai(
+    #     self,
+    #     db: AsyncSession,
+    #     user_id: UUID,
+    #     req: ItineraryGenerateRequest,
+    #     persist: bool = True,   # 🔑 NEW
+    # ):
 
-        duration = (req.end_date - req.start_date).days + 1
+    #     duration = (req.end_date - req.start_date).days + 1
 
-        # ---- RAG retrieval ----
-        places = await rag_retriever.search_places(
-            db=db,
-            query=f"{req.destination} {' '.join(req.interests)}",
-            limit=40
-        )
+    #     # ---- RAG retrieval ----
+    #     places = await rag_retriever.search_places(
+    #         db=db,
+    #         query=f"{req.destination} {' '.join(req.interests)}",
+    #         limit=40
+    #     )
 
-        if not places:
-            raise HTTPException(
-                status_code=400,
-                detail="No places found to generate itinerary"
-            )
+    #     if not places:
+    #         raise HTTPException(
+    #             status_code=400,
+    #             detail="No places found to generate itinerary"
+    #         )
 
-        context = "\n".join(
-            f"ID:{p.id} Title:{p.title} Category:{p.category}"
-            for p in places
-        )
+    #     context = "\n".join(
+    #         f"ID:{p.id} Title:{p.title} Category:{p.category}"
+    #         for p in places
+    #     )
 
-        places_map = {str(p.id): p for p in places}
+    #     places_map = {str(p.id): p for p in places}
 
-        # ---- LLM ----
-        prompt = build_itinerary_prompt(req, duration)
-        response = await llm_service.generate_json(prompt, context)
+    #     # ---- LLM ----
+    #     prompt = build_itinerary_prompt(req, duration)
+    #     response = await llm_service.generate_json(prompt, context)
 
-        try:
-            data = json.loads(response.strip())
-        except json.JSONDecodeError:
-            raise HTTPException(500, "LLM returned invalid JSON")
+    #     try:
+    #         data = json.loads(response.strip())
+    #     except json.JSONDecodeError:
+    #         raise HTTPException(500, "LLM returned invalid JSON")
 
-        # ---- Inject dates + filter invalid POIs ----
-        current_date = req.start_date
-        for day in data["days"]:
-            day.setdefault("date", current_date.isoformat())
-            current_date += timedelta(days=1)
+    #     # ---- Inject dates + filter invalid POIs ----
+    #     current_date = req.start_date
+    #     for day in data["days"]:
+    #         day.setdefault("date", current_date.isoformat())
+    #         current_date += timedelta(days=1)
 
-            day["places"] = [
-                p for p in day["places"]
-                if str(p["place_id"]) in places_map
-            ]
+    #         day["places"] = [
+    #             p for p in day["places"]
+    #             if str(p["place_id"]) in places_map
+    #         ]
 
-        # =====================================================
-        # 🔁 PROPOSAL MODE (NO DB WRITE)
-        # =====================================================
-        if not persist:
-            return {
-                "title": data["title"],
-                "destination": req.destination,
-                "duration_days": duration,
-                "days": data["days"],
-                "tags": data.get("tags", []),
-            }
+    #     # =====================================================
+    #     # 🔁 PROPOSAL MODE (NO DB WRITE)
+    #     # =====================================================
+    #     if not persist:
+    #         return {
+    #             "title": data["title"],
+    #             "destination": req.destination,
+    #             "duration_days": duration,
+    #             "days": data["days"],
+    #             "tags": data.get("tags", []),
+    #         }
 
-        # =====================================================
-        # 💾 PERSIST MODE (UNCHANGED BEHAVIOR)
-        # =====================================================
-        itinerary = Itinerary(
-            user_id=user_id,
-            title=data["title"],
-            description=data.get("description"),
-            destination=req.destination,
-            start_date=req.start_date,
-            end_date=req.end_date,
-            duration_days=duration,
-            days=data["days"],
-            tags=data.get("tags", []),
-            travel_style=req.pace,
-            budget=req.budget,
-            ai_generated=True
-        )
+    #     # =====================================================
+    #     # 💾 PERSIST MODE (UNCHANGED BEHAVIOR)
+    #     # =====================================================
+    #     itinerary = Itinerary(
+    #         user_id=user_id,
+    #         title=data["title"],
+    #         description=data.get("description"),
+    #         destination=req.destination,
+    #         start_date=req.start_date,
+    #         end_date=req.end_date,
+    #         duration_days=duration,
+    #         days=data["days"],
+    #         tags=data.get("tags", []),
+    #         travel_style=req.pace,
+    #         budget=req.budget,
+    #         ai_generated=True
+    #     )
 
-        db.add(itinerary)
-        await db.commit()
-        await db.refresh(itinerary)
+    #     db.add(itinerary)
+    #     await db.commit()
+    #     await db.refresh(itinerary)
 
-        # ---- Normalized table (analytics) ----
-        for day in data["days"]:
-            for place in day["places"]:
-                db.add(ItineraryPlace(
-                    itinerary_id=itinerary.id,
-                    place_id=int(place["place_id"]),
-                    day_number=day["day"],
-                    order_in_day=place["order"]
-                ))
+    #     # ---- Normalized table (analytics) ----
+    #     for day in data["days"]:
+    #         for place in day["places"]:
+    #             db.add(ItineraryPlace(
+    #                 itinerary_id=itinerary.id,
+    #                 place_id=int(place["place_id"]),
+    #                 day_number=day["day"],
+    #                 order_in_day=place["order"]
+    #             ))
 
-        await db.commit()
-        return itinerary
+    #     await db.commit()
+    #     return itinerary
 
    # =====================================================
     # TEXT → STRUCTURED ITINERARY (FROM CHAT)
@@ -154,7 +152,7 @@ class ItineraryService:
 
         itinerary = Itinerary(
             user_id=user_id,
-            title=f"{req.destination} Trip",
+            title=f"{req.destination} {len(days)}-Day Trip",
             destination=req.destination,
             start_date=req.start_date,
             end_date=req.start_date + timedelta(days=len(days) - 1),
@@ -164,8 +162,21 @@ class ItineraryService:
         )
 
         db.add(itinerary)
+        await db.flush()  # ensures itinerary.id exists without committing
+
+        for day in days:
+            for place in day["places"]:
+                db.add(ItineraryPlace(
+                    itinerary_id=itinerary.id,
+                    place_id=int(place["place_id"]),
+                    day_number=day["day"],
+                    order_in_day=place["order"]
+                ))
+
         await db.commit()
         await db.refresh(itinerary)
+
+
 
         return itinerary
 

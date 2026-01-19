@@ -1,3 +1,4 @@
+# auth/repository.py
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from uuid import UUID
@@ -16,19 +17,19 @@ class UserRepository:
         db: AsyncSession,
         user_id: UUID,
         email: str,
-        password_hash: str,
+        hashed_password: str,
         name: str | None,
         country_code: str | None,
     ):
         await db.execute(
             text("""
-                INSERT INTO users (id, email, password_hash, name, country_code)
-                VALUES (:id, :email, :password_hash, :name, :country_code)
+                INSERT INTO users (id, email, hashed_password, name, country_code)
+                VALUES (:id, :email, :hashed_password, :name, :country_code)
             """),
             {
                 "id": user_id,
                 "email": email,
-                "password_hash": password_hash,
+                "hashed_password": hashed_password,
                 "name": name,
                 "country_code": country_code,
             },
@@ -45,5 +46,4 @@ class UserRepository:
             """),
             {"user_id": user_id},
         )
-        row = result.mappings().first()
-        return row
+        return result.mappings().first()
