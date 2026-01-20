@@ -1,10 +1,17 @@
+# schemas/chat.py
 from pydantic import BaseModel
 from typing import Optional
 
 
+class Location(BaseModel):
+    lat: float
+    lng: float
+
+
 class ChatRequest(BaseModel):
-    question: str
+    message: str
     conversation_id: Optional[str] = None
+    location: Optional[Location] = None
 
 
 class ChatResponse(BaseModel):

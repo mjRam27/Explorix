@@ -1,3 +1,4 @@
+# transport/routes.py
 from fastapi import APIRouter, Query
 from typing import Optional
 
@@ -7,7 +8,7 @@ from transport.departure_service import fetch_departures
 from transport.route_service import find_shortest_route
 from utils.resolve import get_station_id
 from db.db_mongo import get_station_logs  # helper, not raw client
-
+from pymongo.collection import Collection
 router = APIRouter(prefix="/transport", tags=["Transport"])
 
 
@@ -37,8 +38,15 @@ def refresh(token: str):
 
 
 @router.get("/stations")
-def get_stations():
-    return get_station_logs()
+def suggest_stations(q: str = Query(..., min_length=1)):
+    regex_query = {
+        "name": {
+            "$regex": f"^{q}",
+            "$options": "i"
+        }
+    }
+    return get_station_logs(regex_query)
+
 
 
 @router.get("/departures")

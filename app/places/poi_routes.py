@@ -1,8 +1,9 @@
-# app/places/poi_routes.py
-from fastapi import APIRouter, Query, HTTPException, Depends
-from sqlalchemy.sql import text
+# places/poi_routes.py
+from fastapi import APIRouter, Query, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.postgres import get_db
+from sqlalchemy.sql import text
+from db.postgres import get_db
+from core.dependencies import get_current_user
 
 router = APIRouter(prefix="/pois", tags=["POIs"])
 
@@ -13,6 +14,7 @@ async def get_pois(
     poi_type: str | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),  # 🔒 AUTH
 ):
     sql = """
     SELECT
@@ -42,16 +44,8 @@ async def get_pois(
         sql += " AND poi_type = :poi_type"
         params["poi_type"] = poi_type
 
-    sql += """
-    ORDER BY rating DESC NULLS LAST
-    LIMIT :limit
-    """
+    sql += " ORDER BY rating DESC NULLS LAST LIMIT :limit"
     params["limit"] = limit
 
     result = await db.execute(text(sql), params)
-    rows = result.fetchall()
-
-    if not rows:
-        return {"message": "No POIs found"}
-
-    return [dict(row._mapping) for row in rows]
+    return [dict(row._mapping) for row in result.fetchall()]

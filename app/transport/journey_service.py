@@ -1,3 +1,4 @@
+# transport/journey_service.py
 import requests
 from pymongo import MongoClient
 from dotenv import load_dotenv
@@ -37,17 +38,24 @@ def fetch_journey(from_station: str, to_station: str, products: list[str] = None
         "departure": departure,
     }
 
-    if products:
-        modes_map = {
-            "train": ["suburban", "subway", "regional", "express"],
-            "bus": ["bus"],
-            "tram": ["tram"],
-            "all": ["suburban", "subway", "regional", "express", "bus", "tram"]
-        }
+    # Normalize products → default to ALL
+    if not products:
+        products = ["ALL"]
 
-        for p in products:
-            for mode in modes_map.get(p, []):
+    PRODUCT_MAP = {
+        "BUS": ["bus"],
+        "TRAM": ["tram"],
+        "TRAIN": ["regional", "suburban"],
+        "ICE": ["express"],
+        "ALL": ["bus", "tram", "regional", "suburban", "express"]
+    }
+
+    for p in products:
+        modes = PRODUCT_MAP.get(p.upper())
+        if modes:
+            for mode in modes:
                 params.setdefault("products[]", []).append(mode)
+
 
     if date:
         params["departure"] = date

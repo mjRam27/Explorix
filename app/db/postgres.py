@@ -1,15 +1,57 @@
 # app/db/postgres.py
+
 import os
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from typing import AsyncGenerator
+from dotenv import load_dotenv
+
+from sqlalchemy.ext.asyncio import (
+    create_async_engine,
+    async_sessionmaker,
+    AsyncSession,
+)
+from sqlalchemy.orm import declarative_base
+
+# =====================================================
+# BASE (REQUIRED FOR MODELS)
+# =====================================================
+
+Base = declarative_base()
+
+# =====================================================
+# FORCE .env LOADING
+# =====================================================
+
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # app/
+ENV_PATH = os.path.join(BASE_DIR, ".env")
+
+print(">>> LOADING ENV FROM:", ENV_PATH)
+load_dotenv(ENV_PATH)
+
+# =====================================================
+# ENV VARIABLES
+# =====================================================
+
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT")
+POSTGRES_DB = os.getenv("POSTGRES_DB")
+
+if not all([POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB]):
+    raise RuntimeError("❌ Postgres environment variables are NOT loaded")
+
+# =====================================================
+# DATABASE URL
+# =====================================================
 
 DATABASE_URL = (
-    f"postgresql+asyncpg://{os.getenv('POSTGRES_USER')}:"
-    f"{os.getenv('POSTGRES_PASSWORD')}@"
-    f"{os.getenv('POSTGRES_HOST')}:"
-    f"{os.getenv('POSTGRES_PORT')}/"
-    f"{os.getenv('POSTGRES_DB')}"
+    f"postgresql+asyncpg://{POSTGRES_USER}:"
+    f"{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 )
+
+# =====================================================
+# ENGINE & SESSION
+# =====================================================
 
 engine = create_async_engine(
     DATABASE_URL,

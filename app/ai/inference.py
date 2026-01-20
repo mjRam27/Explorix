@@ -1,3 +1,4 @@
+# ai/inference.py
 import torch
 from ai.model_loader import load_explorix_model
 
