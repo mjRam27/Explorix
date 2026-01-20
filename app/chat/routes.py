@@ -5,14 +5,14 @@ from schemas.chat import ChatRequest, ChatResponse, ChatResponseType
 from chat.service import (
     create_conversation,
     append_message,
-    build_messages_for_llm
+    build_messages_for_llm,
+    extract_city
 )
 from chat.intent import detect_intent, ChatIntent
 from db.postgres import get_db
 from utils.translation import translate_back
 from rag.llm_service import llm_service
 from rag.retriever import rag_retriever
-from chat.service import extract_city
 
 router = APIRouter(prefix="/explorix", tags=["Chat"])
 
@@ -22,7 +22,7 @@ async def chat(
     req: ChatRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    user_id = "demo_user"  # later JWT
+    user_id = "demo_user"
 
     conversation_id = (
         create_conversation(user_id)
@@ -33,7 +33,7 @@ async def chat(
     intent = detect_intent(req.message)
 
     # =========================
-    # 1️⃣ POI SEARCH (RAG)
+    # POI SEARCH
     # =========================
     if intent == ChatIntent.POI_SEARCH:
         places = await rag_retriever.search_places(
@@ -42,12 +42,12 @@ async def chat(
             limit=8
         )
 
-        if not places:
-            response = "I couldn’t find relevant places nearby."
-        else:
-            response = "Here are some places you might like:\n\n"
-            for p in places:
-                response += f"- {p.title} ({p.category})\n"
+        response = (
+            "Here are some places you might like:\n" +
+            "\n".join(f"- {p.title} ({p.category})" for p in places)
+            if places else
+            "I couldn’t find relevant places."
+        )
 
         append_message(conversation_id, "user", req.message)
         append_message(conversation_id, "assistant", response)
@@ -59,47 +59,28 @@ async def chat(
         )
 
     # =========================
-    # 2️⃣ ITINERARY REQUEST (TEXT ONLY)
+    # CHAT / ITINERARY
     # =========================
     messages, user_lang = await build_messages_for_llm(
         db=db,
         conversation_id=conversation_id,
         user_message=req.message,
-        location=req.location
+        location=req.location,
+        intent=intent
     )
 
-    if intent == ChatIntent.ITINERARY_REQUEST:
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are a travel assistant.\n"
-                    "Create a clear day-by-day itinerary.\n"
-                    "Use Day 1, Day 2.\n"
-                    "Morning / Afternoon / Evening.\n"
-                    "Only mention places relevant to the destination.\n"
-                    "Do not use JSON."
-                )
-            }
-        ] + messages
-
-    # =========================
-    # 3️⃣ GENERAL CHAT
-    # =========================
     answer_en = await llm_service.generate_text(messages)
+
+
     final_answer = translate_back(answer_en, user_lang)
 
     append_message(conversation_id, "user", req.message)
     append_message(conversation_id, "assistant", final_answer)
-    
-    destination = None
-    if intent == ChatIntent.ITINERARY_REQUEST:
-        destination = (
-            req.location.city
-            if req.location
-            else extract_city(req.message)
-        )
 
+    destination = (
+        req.location.city if req.location
+        else extract_city(req.message)
+    ) if intent == ChatIntent.ITINERARY_REQUEST else None
 
     return ChatResponse(
         conversation_id=conversation_id,
@@ -115,8 +96,6 @@ async def chat(
                 "status": "proposed",
                 "can_save": True
             }
-            if intent == ChatIntent.ITINERARY_REQUEST
-            else None
+            if intent == ChatIntent.ITINERARY_REQUEST else None
         )
-
     )
