@@ -7,7 +7,6 @@ from uuid import UUID
 
 from db.postgres import get_db
 from schemas.itinerary import (
-    ItineraryGenerateRequest,
     ItineraryCreateRequest,
     ItineraryResponse
 )
@@ -16,7 +15,8 @@ from itinerary.service import ItineraryService
 
 from itinerary.models import Itinerary
 from core.dependencies import get_current_user
-from schemas.itinerary_from_text import ItineraryFromTextRequest
+from schemas.itinerary_draft import ItineraryDraftRequest
+
 
 
 router = APIRouter(prefix="/itinerary", tags=["Itinerary"])
@@ -31,14 +31,6 @@ async def create_manual(
 ):
     return await service.create_manual(db, user.id, req)
 
-
-@router.post("/from-text", response_model=ItineraryResponse)
-async def create_from_text(
-    req: ItineraryFromTextRequest,
-    db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user)
-):
-    return await service.create_from_text(db, user.id, req)
 
 
 @router.get("/my")
@@ -68,3 +60,20 @@ async def get_itinerary_by_id(
         raise HTTPException(status_code=404, detail="Itinerary not found")
 
     return await service.enrich_itinerary(db, itinerary)
+
+@router.post("/add")
+async def add_itinerary_from_draft(
+    req: ItineraryDraftRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    itinerary = await service.save_from_draft(
+        db=db,
+        user_id=user.id,
+        draft=req.draft
+    )
+
+    return {
+        "id": str(itinerary.id),
+        "status": "saved"
+    }

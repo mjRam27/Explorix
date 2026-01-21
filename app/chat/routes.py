@@ -1,3 +1,4 @@
+# chat/routes.py
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +14,7 @@ from db.postgres import get_db
 from utils.translation import translate_back
 from rag.llm_service import llm_service
 from rag.retriever import rag_retriever
+from itinerary.parser import convert_ai_response_to_itinerary
 
 router = APIRouter(prefix="/explorix", tags=["Chat"])
 
@@ -82,6 +84,22 @@ async def chat(
         else extract_city(req.message)
     ) if intent == ChatIntent.ITINERARY_REQUEST else None
 
+    itinerary_draft = None
+
+    if intent == ChatIntent.ITINERARY_REQUEST and destination:
+        places = await rag_retriever.search_places(
+            db=db,
+            query=destination,
+            limit=10
+        )
+
+        itinerary_draft = convert_ai_response_to_itinerary(
+            ai_text=final_answer,
+            city=destination,
+            places=places
+        )
+
+
     return ChatResponse(
         conversation_id=conversation_id,
         response=final_answer,
@@ -94,7 +112,8 @@ async def chat(
             {
                 "destination": destination,
                 "status": "proposed",
-                "can_save": True
+                "can_save": True,
+                "draft": itinerary_draft  # 🔹 ADD THIS
             }
             if intent == ChatIntent.ITINERARY_REQUEST else None
         )

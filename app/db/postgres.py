@@ -66,3 +66,9 @@ AsyncSessionLocal = async_sessionmaker(
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         yield session
+
+    
+# 🔑 FORCE MODEL REGISTRATION FOR SQLALCHEMY
+from auth.models import User
+from itinerary.models import Itinerary, ItineraryPlace
+from places.models import Place
