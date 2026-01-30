@@ -12,7 +12,8 @@
     ],
     "plugins": [
       "expo-router",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-secure-store"
     ],
     "android": {
       "package": "com.anonymous.explorix"
