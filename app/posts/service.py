@@ -1,4 +1,3 @@
-# app/posts/service.py
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
@@ -9,12 +8,27 @@ from posts.models import Post
 async def create_post(
     db: AsyncSession,
     user_id,
-    content: str
+    media_url: str,
+    media_type: str,
+    category: str,
+    caption: str | None = None,
+    location_name: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    has_audio: str | None = None,
 ) -> Post:
     post = Post(
         user_id=user_id,
-        content=content
+        media_url=media_url,
+        media_type=media_type,
+        category=category,
+        caption=caption,
+        location_name=location_name,
+        latitude=latitude,
+        longitude=longitude,
+        has_audio=has_audio,
     )
+
     db.add(post)
     await db.commit()
     await db.refresh(post)

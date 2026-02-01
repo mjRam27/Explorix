@@ -1,7 +1,7 @@
-# app/posts/routes.py
-from fastapi import APIRouter, Depends, Body, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
+from pydantic import BaseModel
 
 from db.postgres import get_db
 from core.dependencies import get_current_user
@@ -13,13 +13,37 @@ from posts.service import (
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
 
+
+class CreatePostRequest(BaseModel):
+    media_url: str
+    media_type: str
+    category: str
+    caption: str | None = None
+    location_name: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    has_audio: str | None = None
+
+
 @router.post("/")
 async def create(
-    content: str = Body(..., embed=True),
+    payload: CreatePostRequest,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    return await create_post(db, user.id, content)
+    return await create_post(
+        db=db,
+        user_id=user.id,
+        media_url=payload.media_url,
+        media_type=payload.media_type,
+        category=payload.category,
+        caption=payload.caption,
+        location_name=payload.location_name,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        has_audio=payload.has_audio,
+    )
+
 
 @router.get("/me")
 async def my_posts(
@@ -29,6 +53,7 @@ async def my_posts(
     user=Depends(get_current_user)
 ):
     return await get_my_posts(db, user.id, cursor, limit)
+
 
 @router.get("/user/{user_id}")
 async def user_posts(
