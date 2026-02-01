@@ -6,10 +6,10 @@ from datetime import datetime
 
 from db.postgres import get_db
 from core.dependencies import get_current_user
+from posts.feed_service import get_following_feed
 from social.service import (
     follow_user,
     unfollow_user,
-    get_feed,
     get_discovery_feed
 )
 
@@ -38,15 +38,20 @@ async def unfollow(
     return {"status": "unfollowed"}
 
 
-# 🔹 Main feed (followers)
+# 🔹 Main feed (aggregated: posts + likes + saves)
 @router.get("/feed")
 async def feed(
     cursor: datetime | None = Query(None),
     limit: int = Query(20, le=50),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
 ):
-    return await get_feed(db, user.id, cursor, limit)
+    return await get_following_feed(
+        db=db,
+        current_user_id=user.id,
+        cursor=cursor,
+        limit=limit,
+    )
 
 
 # 🔹 Discovery feed (country-based)

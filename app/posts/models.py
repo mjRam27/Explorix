@@ -1,6 +1,5 @@
-# app/posts/models.py
+# posts/models.py
 import uuid
-from datetime import datetime
 
 from sqlalchemy import (
     Column,
@@ -18,6 +17,9 @@ from sqlalchemy.orm import relationship
 from db.postgres import Base
 
 
+# =========================
+# POSTS (CONTENT ONLY)
+# =========================
 class Post(Base):
     __tablename__ = "posts"
 
@@ -31,15 +33,13 @@ class Post(Base):
     )
 
     # 🔹 Media
-    media_url = Column(Text, nullable=False)
+    media_url = Column(Text, nullable=True)
+
     media_type = Column(
         Enum("image", "video", name="media_type"),
-        nullable=False,
+        nullable=True,
     )
-    has_audio = Column(String, nullable=True)
 
-    # 🔹 Content
-    caption = Column(Text, nullable=True)
     category = Column(
         Enum(
             "food",
@@ -49,7 +49,7 @@ class Post(Base):
             "hidden_gems",
             name="post_category",
         ),
-        nullable=False,
+        nullable=True,
         index=True,
     )
 
@@ -64,5 +64,92 @@ class Post(Base):
         index=True,
     )
 
-    # 🔹 Relationship
+    # 🔹 Relationships
     user = relationship("User", back_populates="posts")
+
+
+# =========================
+# POST LIKES
+# =========================
+class PostLike(Base):
+    __tablename__ = "post_likes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    post_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("posts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
+# =========================
+# POST SAVES (NEXT STOP / FAVORITES)
+# =========================
+class PostSave(Base):
+    __tablename__ = "post_saves"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    post_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("posts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
+# =========================
+# POST COMMENTS
+# =========================
+class PostComment(Base):
+    __tablename__ = "post_comments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    post_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("posts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    content = Column(Text, nullable=False)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        index=True,
+    )
