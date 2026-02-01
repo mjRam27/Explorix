@@ -1,8 +1,12 @@
 import MapView, { Region } from "react-native-maps";
 import { StyleSheet, View } from "react-native";
 
+type Props = {
+  journey: any | null;
+};
+
 const INITIAL_REGION: Region = {
-  latitude: 49.4875, // Heidelberg
+  latitude: 49.4875,
   longitude: 8.466,
   latitudeDelta: 0.15,
   longitudeDelta: 0.15,
@@ -14,7 +18,8 @@ const lightMapStyle = [
   { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }] },
 ];
 
-export default function TransportMap() {
+export default function TransportMap({ journey }: Props) {
+  // you can later draw polyline based on journey
   return (
     <View style={{ flex: 1 }}>
       <MapView

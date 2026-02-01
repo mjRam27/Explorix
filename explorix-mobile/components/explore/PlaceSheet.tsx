@@ -17,21 +17,29 @@ const EXPANDED = SCREEN_HEIGHT * 0.25;
 
 type Props = {
   places: Place[];
+  onExpand: () => void;
+  onCollapse: () => void;
 };
 
-export default function PlaceSheet({ places }: Props) {
+export default function PlaceSheet({
+  places,
+  onExpand,
+  onCollapse,
+}: Props) {
   const translateY = useRef(new Animated.Value(COLLAPSED)).current;
   const startY = useRef(COLLAPSED);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-onMoveShouldSetPanResponder: (_, gesture) =>
-  Math.abs(gesture.dy) > 8,
 
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dy) > 8,
 
       onPanResponderGrant: () => {
-        translateY.stopAnimation((v) => (startY.current = v));
+        translateY.stopAnimation((value) => {
+          startY.current = value;
+        });
       },
 
       onPanResponderMove: (_, gesture) => {
@@ -43,10 +51,18 @@ onMoveShouldSetPanResponder: (_, gesture) =>
       },
 
       onPanResponderRelease: (_, gesture) => {
+        const shouldExpand = gesture.dy < -50;
+
         Animated.spring(translateY, {
-          toValue: gesture.dy < -50 ? EXPANDED : COLLAPSED,
+          toValue: shouldExpand ? EXPANDED : COLLAPSED,
           useNativeDriver: false,
         }).start();
+
+        if (shouldExpand) {
+          onExpand();
+        } else {
+          onCollapse();
+        }
       },
     })
   ).current;
@@ -61,11 +77,10 @@ onMoveShouldSetPanResponder: (_, gesture) =>
         <View style={styles.handle} />
       </View>
 
-      {/* SCROLLABLE CONTENT */}
+      {/* CONTENT */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={16}
         contentContainerStyle={styles.scrollContent}
       >
         <Text style={styles.count}>Places nearby: {places.length}</Text>

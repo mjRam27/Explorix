@@ -1,18 +1,19 @@
+// app/(tabs)/transport.tsx
 import {
   View,
   StyleSheet,
-  Keyboard,
-  TouchableWithoutFeedback,
   TouchableOpacity,
 } from "react-native";
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 
-import TransportMap from "../components/transport/TransportMap";
-import JourneySheet from "../components/transport/JourneySheet";
-import FromToInputs from "../components/transport/FromToInputs";
-import TransportFilters from "../components/transport/TransportFilters";
-import DateTimeModal from "../components/transport/DateTimeModal";
+import TransportMap from "../../components/transport/TransportMap";
+import JourneySheet from "../../components/transport/JourneySheet";
+import FromToInputs from "../../components/transport/FromToInputs";
+import TransportFilters from "../../components/transport/TransportFilters";
+import DateTimeModal from "../../components/transport/DateTimeModal";
+
+
 
 export default function TransportScreen() {
   const [from, setFrom] = useState("");

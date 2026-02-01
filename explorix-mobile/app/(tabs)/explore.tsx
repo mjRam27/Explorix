@@ -1,14 +1,18 @@
 // app/explore.tsx
 import { View, StyleSheet, Keyboard } from "react-native";
 import { useEffect, useState } from "react";
-import ExploreMap from "../components/explore/ExploreMap";
-import PlaceSheet from "../components/explore/PlaceSheet";
-import { SearchBar } from "../components/explore/SearchBar";
-import FilterBar from "../components/explore/FilterBar";
-import RadiusSlider from "../components/explore/RadiusSlider";
-import { apiGet } from "../api/client";
-import { Place } from "../components/explore/types";
 import { Ionicons } from "@expo/vector-icons";
+
+import ExploreMap from "../../components/explore/ExploreMap";
+import PlaceSheet from "../../components/explore/PlaceSheet";
+import { SearchBar } from "../../components/explore/SearchBar";
+import FilterBar from "../../components/explore/FilterBar";
+import RadiusSlider from "../../components/explore/RadiusSlider";
+
+import { apiGet } from "../../api/client";
+import { Place } from "../../components/explore/types";
+
+
 
 type Category = {
   key: string;
