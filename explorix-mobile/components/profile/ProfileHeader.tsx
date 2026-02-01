@@ -6,6 +6,7 @@ type Props = {
   email: string;
   bio?: string;
   onOpenSettings: () => void;
+  onAddPost: () => void;
 };
 
 export default function ProfileHeader({
@@ -13,6 +14,7 @@ export default function ProfileHeader({
   email,
   bio,
   onOpenSettings,
+  onAddPost,
 }: Props) {
   return (
     <View style={styles.container}>
@@ -20,9 +22,19 @@ export default function ProfileHeader({
       <View style={styles.topBar}>
         <Text style={styles.username}>{name}</Text>
 
-        <TouchableOpacity onPress={onOpenSettings} hitSlop={10}>
-          <Ionicons name="menu-outline" size={26} />
-        </TouchableOpacity>
+        <View style={styles.actions}>
+          <TouchableOpacity
+            onPress={onAddPost}
+            hitSlop={10}
+            style={styles.addBtn}
+          >
+            <Ionicons name="add-circle-outline" size={26} />
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={onOpenSettings} hitSlop={10}>
+            <Ionicons name="menu-outline" size={26} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Avatar */}
@@ -53,12 +65,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 8, // 👈 important
+    paddingVertical: 8,
   },
 
   username: {
     fontSize: 18,
     fontWeight: "600",
+  },
+
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  addBtn: {
+    marginRight: 14,
   },
 
   avatar: {

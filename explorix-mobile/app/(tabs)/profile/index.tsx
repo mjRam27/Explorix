@@ -135,12 +135,14 @@ const handleLogout = () => {
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
-        <ProfileHeader
-          name={user.name ?? user.email.split("@")[0]}
-          email={user.email}
-          bio={user.bio ?? "Explorer • Travel • Life"}
-          onOpenSettings={() => setSettingsOpen(true)}
-        />
+<ProfileHeader
+  name={user.name ?? user.email.split("@")[0]}
+  email={user.email}
+  bio={user.bio ?? "Explorer • Travel • Life"}
+  onOpenSettings={() => setSettingsOpen(true)}
+  onAddPost={() => router.push("/upload")}
+/>
+
 
         <ProfileStats posts={0} saved={0} itineraries={0} />
 
