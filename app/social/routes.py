@@ -1,35 +1,59 @@
-from fastapi import APIRouter, UploadFile, Form, Query
+# app/social/routes.py
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
+
+from db.postgres import get_db
+from core.dependencies import get_current_user
 from social.service import (
-    find_nearby_users,
-    upload_post,
-    get_posts
+    follow_user,
+    unfollow_user,
+    get_feed,
+    get_discovery_feed
 )
 
 router = APIRouter(prefix="/social", tags=["Social"])
 
 
-@router.get("/connect")
-def connect_users(
-    lat: float,
-    lon: float,
-    radius_km: int = Query(10)
+# 🔹 Follow user
+@router.post("/follow/{user_id}")
+async def follow(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user)
 ):
-    return {
-        "radius_km": radius_km,
-        "nearby_users": find_nearby_users(lat, lon, radius_km),
-    }
+    await follow_user(db, user.id, user_id)
+    return {"status": "followed"}
 
 
-@router.post("/feeds/upload")
-async def upload_feed(
-    user_id: str = Form(...),
-    caption: str = Form(...),
-    file: UploadFile = None
+# 🔹 Unfollow user
+@router.post("/unfollow/{user_id}")
+async def unfollow(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user)
 ):
-    path = upload_post(user_id, caption, file)
-    return {"status": "success", "path": path}
+    await unfollow_user(db, user.id, user_id)
+    return {"status": "unfollowed"}
 
 
-@router.get("/feeds")
-def list_feeds():
-    return get_posts()
+# 🔹 Main feed (followers)
+@router.get("/feed")
+async def feed(
+    cursor: datetime | None = Query(None),
+    limit: int = Query(20, le=50),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    return await get_feed(db, user.id, cursor, limit)
+
+
+# 🔹 Discovery feed (country-based)
+@router.get("/discover")
+async def discover_feed(
+    limit: int = Query(20, le=50),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    return await get_discovery_feed(db, user.country_code, limit)

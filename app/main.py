@@ -16,6 +16,9 @@ from social.routes import router as social_router
 from itinerary.routes import router as itinerary_router
 from places.router import router as places_router
 from debug.routes import router as debug_router
+from user.routes import router as users_router
+from posts.routes import router as posts_router
+
 
 
 
@@ -49,6 +52,9 @@ app.include_router(history_router)
 app.include_router(social_router)
 app.include_router(itinerary_router)
 app.include_router(debug_router)
+app.include_router(users_router)
+app.include_router(posts_router)
+
 
 # ---- Health check ----
 @app.get("/")
