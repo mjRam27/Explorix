@@ -1,3 +1,4 @@
+# posts/social_routes.py    
 from fastapi import APIRouter, Depends, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,8 +9,8 @@ from posts.social_service import (
     unlike_post,
     save_post,
     unsave_post,
-    add_comment,
-    get_comments,
+    # add_comment,
+    # get_comments,
 )
 
 router = APIRouter(prefix="/posts", tags=["Post Social"])
@@ -39,16 +40,16 @@ async def unsave(post_id: str, db: AsyncSession = Depends(get_db), user=Depends(
     return {"status": "unsaved"}
 
 
-@router.post("/{post_id}/comment")
-async def comment(
-    post_id: str,
-    content: str = Body(..., embed=True),
-    db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
-):
-    return await add_comment(db, post_id, user.id, content)
+# @router.post("/{post_id}/comment")
+# async def comment(
+#     post_id: str,
+#     content: str = Body(..., embed=True),
+#     db: AsyncSession = Depends(get_db),
+#     user=Depends(get_current_user),
+# ):
+#     return await add_comment(db, post_id, user.id, content)
 
 
-@router.get("/{post_id}/comments")
-async def comments(post_id: str, db: AsyncSession = Depends(get_db)):
-    return await get_comments(db, post_id)
+# @router.get("/{post_id}/comments")
+# async def comments(post_id: str, db: AsyncSession = Depends(get_db)):
+#     return await get_comments(db, post_id)
