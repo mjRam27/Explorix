@@ -1,4 +1,4 @@
-# posts/models.py
+# app/posts/models.py
 import uuid
 
 from sqlalchemy import (
@@ -18,12 +18,16 @@ from db.postgres import Base
 
 
 # =========================
-# POSTS (CONTENT ONLY)
+# POSTS
 # =========================
 class Post(Base):
     __tablename__ = "posts"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
 
     user_id = Column(
         UUID(as_uuid=True),
@@ -40,6 +44,7 @@ class Post(Base):
         nullable=True,
     )
 
+    # 🔹 Category
     category = Column(
         Enum(
             "food",
@@ -52,6 +57,9 @@ class Post(Base):
         nullable=True,
         index=True,
     )
+
+    # 🔹 Caption
+    caption = Column(Text, nullable=True)
 
     # 🔹 Location
     location_name = Column(String, nullable=True)
@@ -74,7 +82,11 @@ class Post(Base):
 class PostLike(Base):
     __tablename__ = "post_likes"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
 
     post_id = Column(
         UUID(as_uuid=True),
@@ -97,12 +109,16 @@ class PostLike(Base):
 
 
 # =========================
-# POST SAVES (NEXT STOP / FAVORITES)
+# POST SAVES (FAVORITES)
 # =========================
 class PostSave(Base):
     __tablename__ = "post_saves"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
 
     post_id = Column(
         UUID(as_uuid=True),
@@ -130,7 +146,11 @@ class PostSave(Base):
 class PostComment(Base):
     __tablename__ = "post_comments"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
 
     post_id = Column(
         UUID(as_uuid=True),

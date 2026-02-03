@@ -8,7 +8,7 @@ from posts.social_service import (
     like_post,
     unlike_post,
     save_post,
-    unsave_post,
+    unsave_post
     # add_comment,
     # get_comments,
 )

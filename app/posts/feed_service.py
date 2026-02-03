@@ -14,61 +14,53 @@ async def get_following_feed(
     cursor: datetime | None = None,
     limit: int = 20,
 ):
-    """
-    Returns enriched feed:
-    - post
-    - likes_count
-    - comments_count
-    - is_liked
-    - is_saved
-    """
-
-    # Base post query (only followed users)
-    stmt = (
+    base_stmt = (
         select(
             Post,
-
-            # 🔢 likes count
             (
                 select(func.count(PostLike.id))
                 .where(PostLike.post_id == Post.id)
                 .scalar_subquery()
             ).label("likes_count"),
-
-            # 💬 comments count
             (
                 select(func.count(PostComment.id))
                 .where(PostComment.post_id == Post.id)
                 .scalar_subquery()
             ).label("comments_count"),
-
-            # ❤️ is liked by current user
             exists().where(
                 PostLike.post_id == Post.id,
                 PostLike.user_id == current_user_id,
             ).label("is_liked"),
-
-            # 🔖 is saved by current user
             exists().where(
                 PostSave.post_id == Post.id,
                 PostSave.user_id == current_user_id,
             ).label("is_saved"),
         )
-        .join(UserFollow, Post.user_id == UserFollow.following_id)
-        .where(UserFollow.follower_id == current_user_id)
         .order_by(Post.created_at.desc())
         .limit(limit)
     )
 
+    # ✅ APPLY CURSOR ONCE
     if cursor:
-        stmt = stmt.where(Post.created_at < cursor)
+        base_stmt = base_stmt.where(Post.created_at < cursor)
+
+    # FOLLOWING feed
+    stmt = (
+        base_stmt
+        .join(UserFollow, Post.user_id == UserFollow.following_id)
+        .where(UserFollow.follower_id == current_user_id)
+    )
 
     result = await db.execute(stmt)
+    rows = result.all()
 
-    # 🎁 Format response
-    feed = []
-    for post, likes_count, comments_count, is_liked, is_saved in result.all():
-        feed.append({
+    # GLOBAL fallback (still cursor-safe)
+    if not rows:
+        result = await db.execute(base_stmt)
+        rows = result.all()
+
+    return [
+        {
             "id": post.id,
             "user_id": post.user_id,
             "media_url": post.media_url,
@@ -79,12 +71,68 @@ async def get_following_feed(
             "latitude": post.latitude,
             "longitude": post.longitude,
             "created_at": post.created_at,
-
-            # 🔥 Enriched fields
             "likes_count": likes_count,
             "comments_count": comments_count,
             "is_liked": is_liked,
             "is_saved": is_saved,
-        })
+        }
+        for post, likes_count, comments_count, is_liked, is_saved in rows
+    ]
 
-    return feed
+async def get_my_posts_enriched(
+    db: AsyncSession,
+    user_id,
+    cursor: datetime | None = None,
+    limit: int = 20,
+):
+    stmt = (
+        select(
+            Post,
+            (
+                select(func.count(PostLike.id))
+                .where(PostLike.post_id == Post.id)
+                .scalar_subquery()
+            ).label("likes_count"),
+            (
+                select(func.count(PostComment.id))
+                .where(PostComment.post_id == Post.id)
+                .scalar_subquery()
+            ).label("comments_count"),
+            exists().where(
+                PostLike.post_id == Post.id,
+                PostLike.user_id == user_id,
+            ).label("is_liked"),
+            exists().where(
+                PostSave.post_id == Post.id,
+                PostSave.user_id == user_id,
+            ).label("is_saved"),
+        )
+        .where(Post.user_id == user_id)
+        .order_by(Post.created_at.desc())
+        .limit(limit)
+    )
+
+    if cursor:
+        stmt = stmt.where(Post.created_at < cursor)
+
+    result = await db.execute(stmt)
+
+    return [
+        {
+            "id": post.id,
+            "user_id": post.user_id,
+            "media_url": post.media_url,
+            "media_type": post.media_type,
+            "caption": post.caption,
+            "category": post.category,
+            "location_name": post.location_name,
+            "latitude": post.latitude,
+            "longitude": post.longitude,
+            "created_at": post.created_at,
+            "likes_count": likes_count,
+            "comments_count": comments_count,
+            "is_liked": is_liked,
+            "is_saved": is_saved,
+        }
+        for post, likes_count, comments_count, is_liked, is_saved in result.all()
+    ]

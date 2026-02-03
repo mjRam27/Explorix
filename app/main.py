@@ -20,7 +20,9 @@ from user.routes import router as users_router
 from posts.routes import router as posts_router
 from posts.social_routes import router as post_social_router
 
-
+from dotenv import load_dotenv
+load_dotenv()
+from uploads.routes import router as uploads_router
 
 
 
@@ -56,6 +58,8 @@ app.include_router(debug_router)
 app.include_router(users_router)
 app.include_router(posts_router)
 app.include_router(post_social_router)
+app.include_router(uploads_router)
+
 
 
 

@@ -14,6 +14,7 @@ from posts.service import (
     get_post_navigation,
     add_comment, get_comments
 )
+from posts.feed_service import get_my_posts_enriched
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
 
@@ -59,7 +60,7 @@ async def my_posts(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    return await get_my_posts(db, user.id, cursor, limit)
+    return await get_my_posts_enriched(db, user.id, cursor, limit)
 
 
 @router.get("/user/{user_id}")
