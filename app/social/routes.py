@@ -15,6 +15,7 @@ from social.service import (
     unfollow_user,
     get_discovery_feed
 )
+from db.db_redis import cache_json, get_cached_json
 
 router = APIRouter(prefix="/social", tags=["Social"])
 
@@ -49,12 +50,19 @@ async def feed(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    return await get_following_feed(
+    cache_key = f"feed:{user.id}:{cursor or 'none'}:{limit}"
+    cached = get_cached_json(cache_key)
+    if cached:
+        return cached
+
+    result = await get_following_feed(
         db=db,
         current_user_id=user.id,
         cursor=cursor,
         limit=limit,
     )
+    cache_json(cache_key, result, ttl=60)
+    return result
 
 
 # 🔹 Discovery feed (country-based)

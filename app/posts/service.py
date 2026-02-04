@@ -21,7 +21,6 @@ async def create_post(
     location_name: str | None = None,
     latitude: float | None = None,
     longitude: float | None = None,
-    has_audio: str | None = None,
 ) -> Post:
     """
     Create a post.
@@ -37,7 +36,6 @@ async def create_post(
         location_name=location_name,
         latitude=latitude,
         longitude=longitude,
-        has_audio=has_audio,
     )
 
     db.add(post)

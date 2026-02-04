@@ -1,11 +1,12 @@
 # posts/feed_service.py
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, exists
+from sqlalchemy import select, func, exists, or_
 from datetime import datetime
 
 from posts.models import Post, PostLike, PostSave, PostComment
 from social.models import UserFollow
+from utils.gcs import get_signed_url
 
 
 async def get_following_feed(
@@ -44,11 +45,16 @@ async def get_following_feed(
     if cursor:
         base_stmt = base_stmt.where(Post.created_at < cursor)
 
-    # FOLLOWING feed
+    # FOLLOWING feed (include own posts)
     stmt = (
         base_stmt
-        .join(UserFollow, Post.user_id == UserFollow.following_id)
-        .where(UserFollow.follower_id == current_user_id)
+        .outerjoin(UserFollow, Post.user_id == UserFollow.following_id)
+        .where(
+            or_(
+                UserFollow.follower_id == current_user_id,
+                Post.user_id == current_user_id,
+            )
+        )
     )
 
     result = await db.execute(stmt)
@@ -59,11 +65,18 @@ async def get_following_feed(
         result = await db.execute(base_stmt)
         rows = result.all()
 
+    def resolve_media_url(value: str | None) -> str | None:
+        if not value:
+            return None
+        if value.startswith("http://") or value.startswith("https://"):
+            return value
+        return get_signed_url(value)
+
     return [
         {
             "id": post.id,
             "user_id": post.user_id,
-            "media_url": post.media_url,
+            "media_url": resolve_media_url(post.media_url),
             "media_type": post.media_type,
             "caption": post.caption,
             "category": post.category,
@@ -117,11 +130,18 @@ async def get_my_posts_enriched(
 
     result = await db.execute(stmt)
 
+    def resolve_media_url(value: str | None) -> str | None:
+        if not value:
+            return None
+        if value.startswith("http://") or value.startswith("https://"):
+            return value
+        return get_signed_url(value)
+
     return [
         {
             "id": post.id,
             "user_id": post.user_id,
-            "media_url": post.media_url,
+            "media_url": resolve_media_url(post.media_url),
             "media_type": post.media_type,
             "caption": post.caption,
             "category": post.category,

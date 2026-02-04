@@ -15,6 +15,7 @@ from posts.service import (
     add_comment, get_comments
 )
 from posts.feed_service import get_my_posts_enriched
+from db.db_redis import cache_json, get_cached_json, delete_keys_by_prefix
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
 
@@ -30,7 +31,6 @@ class CreatePostRequest(BaseModel):
     location_name: str | None = None
     latitude: float | None = None
     longitude: float | None = None
-    has_audio: str | None = None
 
 
 @router.post("/")
@@ -39,7 +39,7 @@ async def create(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    return await create_post(
+    post = await create_post(
         db=db,
         user_id=user.id,
         media_url=payload.media_url,
@@ -49,8 +49,10 @@ async def create(
         location_name=payload.location_name,
         latitude=payload.latitude,
         longitude=payload.longitude,
-        has_audio=payload.has_audio,
     )
+    delete_keys_by_prefix(f"my_posts:{user.id}:")
+    delete_keys_by_prefix(f"feed:{user.id}:")
+    return post
 
 
 @router.get("/me")
@@ -60,7 +62,14 @@ async def my_posts(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    return await get_my_posts_enriched(db, user.id, cursor, limit)
+    cache_key = f"my_posts:{user.id}:{cursor or 'none'}:{limit}"
+    cached = get_cached_json(cache_key)
+    if cached:
+        return cached
+
+    result = await get_my_posts_enriched(db, user.id, cursor, limit)
+    cache_json(cache_key, result, ttl=60)
+    return result
 
 
 @router.get("/user/{user_id}")
