@@ -13,30 +13,32 @@ from schemas.itinerary import (
 )
 from schemas.itinerary_read import ItineraryEnrichedResponse
 from itinerary.service import ItineraryService
+
 from itinerary.models import Itinerary
 from core.dependencies import get_current_user
+from schemas.itinerary_from_text import ItineraryFromTextRequest
 
 
 router = APIRouter(prefix="/itinerary", tags=["Itinerary"])
 service = ItineraryService()
 
 
-@router.post("/generate", response_model=ItineraryResponse)
-async def generate(
-    req: ItineraryGenerateRequest,
-    db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user)
-):
-    return await service.generate_ai(db, user.id, req)
-
-
 @router.post("/", response_model=ItineraryResponse)
-async def create(
+async def create_manual(
     req: ItineraryCreateRequest,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user)
 ):
     return await service.create_manual(db, user.id, req)
+
+
+@router.post("/from-text", response_model=ItineraryResponse)
+async def create_from_text(
+    req: ItineraryFromTextRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    return await service.create_from_text(db, user.id, req)
 
 
 @router.get("/my")
@@ -59,7 +61,6 @@ async def get_itinerary_by_id(
         Itinerary.id == itinerary_id,
         Itinerary.user_id == user.id
     )
-
     result = await db.execute(stmt)
     itinerary = result.scalar_one_or_none()
 

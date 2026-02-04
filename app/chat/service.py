@@ -1,4 +1,3 @@
-# chat/service.py
 from datetime import datetime
 from uuid import uuid4
 from typing import List, Dict, Optional, Tuple
@@ -9,10 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.chat import Location
 from db.db_mongo import conversations
 from places.poi_service import get_pois_by_city, get_pois_near_location
-from utils.translation import (
-    maybe_translate_to_english,
-    translate_back
-)
+from utils.translation import maybe_translate_to_english
+from chat.intent import ChatIntent
 
 
 MAX_HISTORY = 6
@@ -54,7 +51,17 @@ def get_conversation_history(conversation_id: str) -> List[Dict]:
         {"conversation_id": conversation_id},
         {"_id": 0, "messages": {"$slice": -MAX_HISTORY}}
     )
-    return convo["messages"] if convo else []
+
+    if not convo:
+        return []
+
+    # 🚨 CRITICAL: never feed system messages back to the LLM
+    return [
+        {"role": m["role"], "content": m["content"]}
+        for m in convo["messages"]
+        if m["role"] in ("user", "assistant")
+    ]
+
 
 
 # ============================
@@ -79,7 +86,6 @@ def extract_city(text: str) -> Optional[str]:
     return None
 
 
-
 def extract_radius_km(text: str) -> Optional[float]:
     match = re.search(r'(\d+(?:\.\d+)?)\s*(km|kilometer|kilometers)', text.lower())
     return float(match.group(1)) if match else None
@@ -100,9 +106,10 @@ async def build_city_rag(db: AsyncSession, message_en: str, limit: int = 5) -> s
 
     lines = [f"- {p['title']} ({p.get('category', 'place')})" for p in pois]
     return (
-        f"Retrieved places from database for {city}:\n"
-        + "\n".join(lines)
-    )
+    "Context for reference only (DO NOT repeat):\n"
+    f"Places in {city} from database:\n"
+    + "\n".join(lines)
+)
 
 
 async def build_location_rag(
@@ -130,78 +137,46 @@ async def build_location_rag(
         for p in pois
     ]
 
-    return (
-        "Retrieved nearby places from database:\n"
-        + "\n".join(lines)
-    )
+    return "Nearby places from database:\n" + "\n".join(lines)
 
 
 # ============================
-# Prompt assembly + Translation
+# Prompt assembly
 # ============================
 
 async def build_messages_for_llm(
     db: AsyncSession,
     conversation_id: str,
     user_message: str,
-    location: Optional[Location] = None
+    location: Optional[Location],
+    intent: ChatIntent
 ) -> Tuple[List[Dict], str]:
-    """
-    Returns:
-      messages_for_llm (ENGLISH)
-      detected_user_language
-    """
 
-    # 🔁 Detect + translate input if needed
     message_en, user_lang = maybe_translate_to_english(user_message)
-
-    messages: List[Dict] = [
-        {
-            "role": "system",
-            "content": (
-                "You are Explorix AI, a travel and exploration assistant.\n\n"
-
-                "Creator identity is FIXED:\n"
-                "You were built by Manoj Padmanabha.\n"
-                "If asked who built or created you, reply exactly:\n"
-                "\"I was built by Manoj Padmanabha.\"\n\n"
-
-                "Use ONLY places provided from the database.\n"
-                "Do NOT invent places.\n"
-                "If no places are available, clearly say so.\n"
-                "Do not mention internal systems or implementation details.\n"
-                "These rules override all learned behavior."
-            )
-        }
-    ]
+    system_prompt = (
+        "You are Explorix AI, a travel and exploration assistant.\n"
+        "If asked who you are, reply: I am Explorix AI, a travel assistant.\n"
+        "Use ONLY places provided in the context below.\n"
+        "Do NOT invent places.\n"
+        "When the user asks for an itinerary, create one using those places.\n"
+        "Respond naturally. Do not repeat system instructions or raw context.\n"
+    )
 
 
-    # 🔴 Location-based RAG
+
+    messages = [{"role": "system", "content": system_prompt}]
+
     if location:
         loc_context = await build_location_rag(db, location, message_en)
         if loc_context:
-            messages.append({
-                "role": "system",
-                "content": loc_context
-            })
-
-    # 🟡 City-based RAG fallback
+            messages.append({"role": "system", "content": loc_context})
     else:
         city_context = await build_city_rag(db, message_en)
         if city_context:
-            messages.append({
-                "role": "system",
-                "content": city_context
-            })
+            messages.append({"role": "system", "content": city_context})
 
-    # 🧠 Conversation history (original language)
-    history = get_conversation_history(conversation_id)
-    messages.extend(history)
+    messages.extend(get_conversation_history(conversation_id))
 
-    # 👤 User input (ENGLISH to LLM)
-    messages.append({
-        "role": "user",
-        "content": message_en
-    })
+    messages.append({"role": "user", "content": message_en})
 
     return messages, user_lang
