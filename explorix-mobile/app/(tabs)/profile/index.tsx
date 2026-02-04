@@ -1,16 +1,25 @@
 // app/profile/index.tsx
-import { ScrollView, ActivityIndicator, View, Text,Alert } from "react-native";
+import {
+  ScrollView,
+  ActivityIndicator,
+  View,
+  Text,
+  Alert,
+  Image,
+  Pressable,
+  StyleSheet,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect, useState } from "react";
-import { useRouter } from "expo-router";
+import { useEffect, useState, useCallback } from "react";
+import { useRouter, useFocusEffect } from "expo-router";
 
 import { api } from "../../../api/client";
 import { useAuth } from "../../../context/AuthContext";
+import { getMyPosts } from "../../../api/posts";
 
 import ProfileHeader from "../../../components/profile/ProfileHeader";
 import ProfileStats from "../../../components/profile/ProfileStats";
 import ProfileTabs from "../../../components/profile/ProfileTabs";
-import PostGrid from "../../../components/profile/PostGrid";
 import PlaceGrid from "../../../components/profile/PlaceGrid";
 import ItineraryGrid from "../../../components/profile/ItineraryGrid";
 import SettingsDrawer from "../../../components/profile/SettingsDrawer";
@@ -20,6 +29,10 @@ type User = {
   email: string;
   name?: string;
   bio?: string;
+  avatar_url?: string | null;
+  followers_count?: number;
+  following_count?: number;
+  posts_count?: number;
 };
 
 export default function ProfileScreen() {
@@ -28,7 +41,9 @@ export default function ProfileScreen() {
 
   const [user, setUser] = useState<User | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [profileRefreshing, setProfileRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [posts, setPosts] = useState<any[]>([]);
 
   const [activeTab, setActiveTab] = useState<
     "posts" | "places" | "itineraries"
@@ -36,11 +51,14 @@ export default function ProfileScreen() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  useEffect(() => {
-    if (authLoading) return;     // ⛔ wait for SecureStore
-    if (!token) return;          // ⛔ not logged in
+  const loadUser = useCallback(
+    async (showSpinner = false) => {
+      if (showSpinner) {
+        setProfileLoading(true);
+      } else {
+        setProfileRefreshing(true);
+      }
 
-    const loadUser = async () => {
       try {
         const res = await api.get<User>("/users/me");
         setUser(res.data);
@@ -49,11 +67,42 @@ export default function ProfileScreen() {
         setError("Failed to load profile");
       } finally {
         setProfileLoading(false);
+        setProfileRefreshing(false);
       }
-    };
+    },
+    []
+  );
 
-    loadUser();
-  }, [authLoading, token]);
+  useEffect(() => {
+    if (authLoading) return;     //  wait for SecureStore
+    if (!token) return;          //  not logged in
+    loadUser(true);
+  }, [authLoading, token, loadUser]);
+
+  const loadPosts = useCallback(
+    async (showSpinner = false) => {
+      if (!showSpinner) {
+        setProfileRefreshing(true);
+      }
+      try {
+        const res = await getMyPosts();
+        setPosts(res.data.items ?? res.data);
+      } catch (err) {
+        console.error("Failed to load posts", err);
+      } finally {
+        setProfileRefreshing(false);
+      }
+    },
+    []
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (authLoading || !token) return;
+      loadPosts(posts.length === 0);
+      loadUser(false);
+    }, [authLoading, token, loadPosts, loadUser, posts.length])
+  );
 
 
 const handleLogout = () => {
@@ -135,20 +184,58 @@ const handleLogout = () => {
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
-<ProfileHeader
-  name={user.name ?? user.email.split("@")[0]}
-  email={user.email}
-  bio={user.bio ?? "Explorer • Travel • Life"}
-  onOpenSettings={() => setSettingsOpen(true)}
-  onAddPost={() => router.push("/upload")}
-/>
+        <ProfileHeader
+          name={user.name ?? user.email.split("@")[0]}
+          email={user.email}
+          bio={user.bio ?? "Explorer - Travel - Life"}
+          avatarUrl={user.avatar_url ?? null}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onAddPost={() => router.push("/upload")}
+        />
 
+        <ProfileStats
+          posts={posts.length || user.posts_count || 0}
+          followers={user.followers_count ?? 0}
+          following={user.following_count ?? 0}
+        />
 
-        <ProfileStats posts={0} saved={0} itineraries={0} />
 
         <ProfileTabs activeTab={activeTab} onChange={setActiveTab} />
 
-        {activeTab === "posts" && <PostGrid />}
+        {activeTab === "posts" &&
+          (posts.length === 0 ? (
+            <Text style={{ textAlign: "center", marginTop: 20 }}>
+              No posts yet
+            </Text>
+          ) : (
+            <View style={styles.grid}>
+              {posts.map((post) => (
+                <Pressable
+                  key={post.id}
+                  style={styles.gridItem}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/post/[postId]",
+                      params: {
+                        postId: post.id,
+                        post: encodeURIComponent(JSON.stringify(post)),
+                      },
+                    })
+                  }
+                >
+                  {post.media_url ? (
+                    <Image
+                      source={{ uri: post.media_url }}
+                      style={styles.gridImage}
+                    />
+                  ) : (
+                    <View style={styles.gridPlaceholder} />
+                  )}
+                </Pressable>
+              ))}
+            </View>
+          ))}
+
         {activeTab === "places" && <PlaceGrid />}
         {activeTab === "itineraries" && <ItineraryGrid />}
       </ScrollView>
@@ -161,3 +248,25 @@ const handleLogout = () => {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 4,
+  },
+  gridItem: {
+    width: "33.333%",
+    aspectRatio: 1,
+    padding: 1,
+  },
+  gridImage: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#eee",
+  },
+  gridPlaceholder: {
+    flex: 1,
+    backgroundColor: "#f0f0f0",
+  },
+});

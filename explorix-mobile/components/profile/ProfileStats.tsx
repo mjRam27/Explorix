@@ -2,20 +2,20 @@ import { View, Text, StyleSheet } from "react-native";
 
 type Props = {
   posts: number;
-  saved: number;
-  itineraries: number;
+  followers: number;
+  following: number;
 };
 
 export default function ProfileStats({
   posts,
-  saved,
-  itineraries,
+  followers,
+  following,
 }: Props) {
   return (
     <View style={styles.container}>
       <Stat label="Posts" value={posts} />
-      <Stat label="Saved" value={saved} />
-      <Stat label="Itineraries" value={itineraries} />
+      <Stat label="Followers" value={followers} />
+      <Stat label="Following" value={following} />
     </View>
   );
 }

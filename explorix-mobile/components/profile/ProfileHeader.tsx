@@ -1,10 +1,11 @@
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
   name: string;
   email: string;
   bio?: string;
+  avatarUrl?: string | null;
   onOpenSettings: () => void;
   onAddPost: () => void;
 };
@@ -13,6 +14,7 @@ export default function ProfileHeader({
   name,
   email,
   bio,
+  avatarUrl,
   onOpenSettings,
   onAddPost,
 }: Props) {
@@ -38,8 +40,14 @@ export default function ProfileHeader({
       </View>
 
       {/* Avatar */}
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{name[0]}</Text>
+      <View style={styles.avatarWrap}>
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+        ) : (
+          <View style={styles.avatarFallback}>
+            <Text style={styles.avatarText}>{name[0]}</Text>
+          </View>
+        )}
       </View>
 
       {/* Info */}
@@ -48,9 +56,17 @@ export default function ProfileHeader({
 
       {bio ? <Text style={styles.bio}>{bio}</Text> : null}
 
-      <TouchableOpacity style={styles.editBtn}>
-        <Text style={styles.editText}>Edit profile</Text>
-      </TouchableOpacity>
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={styles.actionBtn}>
+          <Text style={styles.actionText}>Edit profile</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn}>
+          <Text style={styles.actionText}>Share profile</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.iconBtn}>
+          <Ionicons name="person-add-outline" size={18} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -82,13 +98,20 @@ const styles = StyleSheet.create({
     marginRight: 14,
   },
 
+  avatarWrap: {
+    alignSelf: "center",
+    marginVertical: 14,
+  },
   avatar: {
     width: 90,
     height: 90,
     borderRadius: 45,
+  },
+  avatarFallback: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: "#1E88E5",
-    alignSelf: "center",
-    marginVertical: 14,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -119,16 +142,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  editBtn: {
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+  },
+  actionBtn: {
+    flex: 1,
     borderWidth: 1,
     borderColor: "#ddd",
     paddingVertical: 8,
     borderRadius: 8,
-    marginTop: 12,
     alignItems: "center",
+    marginRight: 8,
   },
-
-  editText: {
+  actionText: {
     fontWeight: "500",
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
