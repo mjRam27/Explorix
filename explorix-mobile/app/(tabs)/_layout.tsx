@@ -41,6 +41,14 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
+          name="itinerary"
+          options={{
+            tabBarIcon: ({ color }) => (
+              <Ionicons name="calendar" size={22} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="profile"
           options={{
             tabBarIcon: ({ color }) => (
