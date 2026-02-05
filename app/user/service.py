@@ -6,6 +6,7 @@ from auth.models import User
 from posts.models import Post
 from social.models import UserFollow
 from schemas.user_profile import UpdateProfileRequest
+from utils.gcs import get_signed_url
 
 async def get_my_profile(db: AsyncSession, user_id):
     followers = await db.scalar(
@@ -22,14 +23,23 @@ async def get_my_profile(db: AsyncSession, user_id):
 
     user = await db.get(User, user_id)
 
+    avatar_url = user.avatar_url
+    if avatar_url and not avatar_url.startswith("http"):
+        avatar_url = get_signed_url(avatar_url)
+
     return {
         "id": str(user.id),
         "name": user.name,
         "email": user.email,
         "country_code": user.country_code,
+        "bio": user.bio,
+        "avatar_url": avatar_url,
         "followers": followers,
         "following": following,
-        "posts": posts
+        "posts": posts,
+        "followers_count": followers,
+        "following_count": following,
+        "posts_count": posts,
     }
 
 
@@ -57,13 +67,22 @@ async def get_public_profile(db: AsyncSession, viewer_id, profile_user_id):
         )
     )
 
+    avatar_url = user.avatar_url
+    if avatar_url and not avatar_url.startswith("http"):
+        avatar_url = get_signed_url(avatar_url)
+
     return {
         "id": str(user.id),
         "name": user.name,
         "country_code": user.country_code,
+        "bio": user.bio,
+        "avatar_url": avatar_url,
         "followers": followers,
         "following": following,
         "posts": posts,
+        "followers_count": followers,
+        "following_count": following,
+        "posts_count": posts,
         "is_following": is_following > 0
     }
 
@@ -82,6 +101,10 @@ async def update_my_profile(
 
     if data.country_code is not None:
         user.country_code = data.country_code
+    if data.bio is not None:
+        user.bio = data.bio
+    if data.avatar_url is not None:
+        user.avatar_url = data.avatar_url
 
     await db.commit()
     await db.refresh(user)
@@ -90,5 +113,7 @@ async def update_my_profile(
         "id": str(user.id),
         "name": user.name,
         "email": user.email,
-        "country_code": user.country_code
+        "country_code": user.country_code,
+        "bio": user.bio,
+        "avatar_url": user.avatar_url,
     }

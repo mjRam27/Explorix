@@ -61,7 +61,7 @@ async def feed(
         cursor=cursor,
         limit=limit,
     )
-    cache_json(cache_key, result, ttl=60)
+    cache_json(cache_key, result, ttl=180)
     return result
 
 

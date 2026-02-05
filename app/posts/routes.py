@@ -68,7 +68,7 @@ async def my_posts(
         return cached
 
     result = await get_my_posts_enriched(db, user.id, cursor, limit)
-    cache_json(cache_key, result, ttl=60)
+    cache_json(cache_key, result, ttl=180)
     return result
 
 
@@ -108,12 +108,16 @@ async def add_comment_to_post(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    return await add_comment(
+    result = await add_comment(
         db=db,
         post_id=post_id,
         user_id=user.id,
         content=payload.content,
     )
+    delete_keys_by_prefix(f"feed:{user.id}:")
+    delete_keys_by_prefix(f"my_posts:{user.id}:")
+    delete_keys_by_prefix(f"saved_posts:{user.id}:")
+    return result
 
 
 # =========================

@@ -12,3 +12,5 @@ class UserProfile(BaseModel):
 class UpdateProfileRequest(BaseModel):
     name: Optional[str] = None
     country_code: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None

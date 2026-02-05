@@ -1,5 +1,5 @@
 # auth/models.py
-from sqlalchemy import Column, String, DateTime
+from sqlalchemy import Column, String, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -18,6 +18,8 @@ class User(Base):
 
     name = Column(String(100), nullable=True)
     country_code = Column(String(10), nullable=True)
+    bio = Column(Text, nullable=True)
+    avatar_url = Column(Text, nullable=True)
 
     is_active = Column(String, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

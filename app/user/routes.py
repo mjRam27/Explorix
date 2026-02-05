@@ -10,6 +10,7 @@ from user.service import (
     get_public_profile,
     update_my_profile
 )
+from db.db_redis import cache_json, get_cached_json, delete_keys_by_prefix
 from schemas.user_profile import UpdateProfileRequest
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -21,7 +22,13 @@ async def my_profile(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    return await get_my_profile(db, user.id)
+    cache_key = f"user_me:{user.id}"
+    cached = get_cached_json(cache_key)
+    if cached:
+        return cached
+    profile = await get_my_profile(db, user.id)
+    cache_json(cache_key, profile, ttl=180)
+    return profile
 
 
 # 🔹 Update my profile
@@ -34,6 +41,7 @@ async def edit_my_profile(
     profile = await update_my_profile(db, user.id, payload)
     if not profile:
         raise HTTPException(404, "User not found")
+    delete_keys_by_prefix(f"user_me:{user.id}")
     return profile
 
 

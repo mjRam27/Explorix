@@ -30,10 +30,10 @@ def get_station_logs(filter_query=None, limit=10):
 
     docs = station_logs.find(
         query,
-        {"_id": 0, "station_id": 1, "name": 1}
+        {"_id": 0, "station_id": 1, "name": 1, "line": 1}
     ).limit(limit)
 
     return [
-        {"id": d["station_id"], "name": d["name"]}
+        {"id": d.get("station_id"), "name": d.get("name"), "line": d.get("line")}
         for d in docs
     ]

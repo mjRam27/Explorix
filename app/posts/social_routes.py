@@ -12,6 +12,7 @@ from posts.social_service import (
     # add_comment,
     # get_comments,
 )
+from db.db_redis import delete_keys_by_prefix
 
 router = APIRouter(prefix="/posts", tags=["Post Social"])
 
@@ -19,24 +20,30 @@ router = APIRouter(prefix="/posts", tags=["Post Social"])
 @router.post("/{post_id}/like")
 async def like(post_id: str, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
     await like_post(db, post_id, user.id)
+    delete_keys_by_prefix(f"feed:{user.id}:")
     return {"status": "liked"}
 
 
 @router.post("/{post_id}/unlike")
 async def unlike(post_id: str, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
     await unlike_post(db, post_id, user.id)
+    delete_keys_by_prefix(f"feed:{user.id}:")
     return {"status": "unliked"}
 
 
 @router.post("/{post_id}/save")
 async def save(post_id: str, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
     await save_post(db, post_id, user.id)
+    delete_keys_by_prefix(f"saved_posts:{user.id}:")
+    delete_keys_by_prefix(f"feed:{user.id}:")
     return {"status": "saved"}
 
 
 @router.post("/{post_id}/unsave")
 async def unsave(post_id: str, db: AsyncSession = Depends(get_db), user=Depends(get_current_user)):
     await unsave_post(db, post_id, user.id)
+    delete_keys_by_prefix(f"saved_posts:{user.id}:")
+    delete_keys_by_prefix(f"feed:{user.id}:")
     return {"status": "unsaved"}
 
 

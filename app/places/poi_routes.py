@@ -7,6 +7,31 @@ from core.dependencies import get_current_user
 
 router = APIRouter(prefix="/pois", tags=["POIs"])
 
+@router.get("/search")
+async def search_pois(
+    query: str = Query(..., min_length=1),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),  #  AUTH
+):
+    sql = """
+    SELECT
+        id,
+        title,
+        category,
+        ST_Y(geo::geometry) AS latitude,
+        ST_X(geo::geometry) AS longitude
+    FROM poi
+    WHERE title ILIKE :query
+    ORDER BY title ASC
+    LIMIT :limit
+    """
+    result = await db.execute(
+        text(sql),
+        {"query": f"%{query}%", "limit": limit}
+    )
+    return [dict(row._mapping) for row in result.fetchall()]
+
 @router.get("/")
 async def get_pois(
     category: str | None = Query(None),
