@@ -1,7 +1,7 @@
 import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-type Tab = "posts" | "places" | "itineraries";
+type Tab = "posts" | "saved" | "itineraries";
 
 type Props = {
   activeTab: Tab;
@@ -18,8 +18,8 @@ export default function ProfileTabs({ activeTab, onChange }: Props) {
       />
       <TabButton
         icon="bookmark-outline"
-        active={activeTab === "places"}
-        onPress={() => onChange("places")}
+        active={activeTab === "saved"}
+        onPress={() => onChange("saved")}
       />
       <TabButton
         icon="map-outline"

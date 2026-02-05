@@ -15,12 +15,11 @@ import { useRouter, useFocusEffect } from "expo-router";
 
 import { api } from "../../../api/client";
 import { useAuth } from "../../../context/AuthContext";
-import { getMyPosts } from "../../../api/posts";
+import { getMyPosts, getSavedPosts } from "../../../api/posts";
 
 import ProfileHeader from "../../../components/profile/ProfileHeader";
 import ProfileStats from "../../../components/profile/ProfileStats";
 import ProfileTabs from "../../../components/profile/ProfileTabs";
-import PlaceGrid from "../../../components/profile/PlaceGrid";
 import ItineraryGrid from "../../../components/profile/ItineraryGrid";
 import SettingsDrawer from "../../../components/profile/SettingsDrawer";
 
@@ -44,12 +43,16 @@ export default function ProfileScreen() {
   const [profileRefreshing, setProfileRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [posts, setPosts] = useState<any[]>([]);
+  const [lastProfileFetchAt, setLastProfileFetchAt] = useState<number>(0);
+  const [lastPostsFetchAt, setLastPostsFetchAt] = useState<number>(0);
+  const [lastSavedFetchAt, setLastSavedFetchAt] = useState<number>(0);
 
   const [activeTab, setActiveTab] = useState<
-    "posts" | "places" | "itineraries"
+    "posts" | "saved" | "itineraries"
   >("posts");
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [savedPosts, setSavedPosts] = useState<any[]>([]);
 
   const loadUser = useCallback(
     async (showSpinner = false) => {
@@ -62,6 +65,7 @@ export default function ProfileScreen() {
       try {
         const res = await api.get<User>("/users/me");
         setUser(res.data);
+        setLastProfileFetchAt(Date.now());
       } catch (err) {
         console.error("Failed to load profile", err);
         setError("Failed to load profile");
@@ -87,6 +91,7 @@ export default function ProfileScreen() {
       try {
         const res = await getMyPosts();
         setPosts(res.data.items ?? res.data);
+        setLastPostsFetchAt(Date.now());
       } catch (err) {
         console.error("Failed to load posts", err);
       } finally {
@@ -96,12 +101,54 @@ export default function ProfileScreen() {
     []
   );
 
+  const loadSavedPosts = useCallback(async () => {
+    try {
+      const res = await getSavedPosts();
+      setSavedPosts(res.data.items ?? res.data);
+      setLastSavedFetchAt(Date.now());
+    } catch (err) {
+      console.error("Failed to load saved posts", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "saved") {
+      loadSavedPosts();
+    }
+  }, [activeTab, loadSavedPosts]);
+
   useFocusEffect(
     useCallback(() => {
       if (authLoading || !token) return;
-      loadPosts(posts.length === 0);
-      loadUser(false);
-    }, [authLoading, token, loadPosts, loadUser, posts.length])
+      const now = Date.now();
+      if (posts.length === 0 || now - lastPostsFetchAt >= 180000) {
+        loadPosts(posts.length === 0);
+      }
+      if (!user || now - lastProfileFetchAt >= 180000) {
+        loadUser(false);
+      }
+      if (activeTab === "saved") {
+        if (
+          savedPosts.length === 0 ||
+          now - lastSavedFetchAt >= 180000
+        ) {
+          loadSavedPosts();
+        }
+      }
+    }, [
+      authLoading,
+      token,
+      loadPosts,
+      loadUser,
+      posts.length,
+      activeTab,
+      loadSavedPosts,
+      lastProfileFetchAt,
+      lastPostsFetchAt,
+      lastSavedFetchAt,
+      user,
+      savedPosts.length,
+    ])
   );
 
 
@@ -191,6 +238,7 @@ const handleLogout = () => {
           avatarUrl={user.avatar_url ?? null}
           onOpenSettings={() => setSettingsOpen(true)}
           onAddPost={() => router.push("/upload")}
+          onEditProfile={() => router.push("/profile/edit")}
         />
 
         <ProfileStats
@@ -236,7 +284,39 @@ const handleLogout = () => {
             </View>
           ))}
 
-        {activeTab === "places" && <PlaceGrid />}
+        {activeTab === "saved" &&
+          (savedPosts.length === 0 ? (
+            <Text style={{ textAlign: "center", marginTop: 20 }}>
+              No saved posts yet
+            </Text>
+          ) : (
+            <View style={styles.grid}>
+              {savedPosts.map((post) => (
+                <Pressable
+                  key={post.id}
+                  style={styles.gridItem}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/post/[postId]",
+                      params: {
+                        postId: post.id,
+                        post: encodeURIComponent(JSON.stringify(post)),
+                      },
+                    })
+                  }
+                >
+                  {post.media_url ? (
+                    <Image
+                      source={{ uri: post.media_url }}
+                      style={styles.gridImage}
+                    />
+                  ) : (
+                    <View style={styles.gridPlaceholder} />
+                  )}
+                </Pressable>
+              ))}
+            </View>
+          ))}
         {activeTab === "itineraries" && <ItineraryGrid />}
       </ScrollView>
 

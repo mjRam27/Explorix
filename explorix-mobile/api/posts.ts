@@ -53,3 +53,17 @@ export const createPost = (payload: {
   latitude?: number | null;
   longitude?: number | null;
 }) => api.post("/posts/", payload);
+
+export const getSavedPosts = () => api.get("/posts/saved");
+
+export const uploadAvatar = (file: {
+  uri: string;
+  name: string;
+  type: string;
+}) => {
+  const form = new FormData();
+  form.append("file", file as any);
+  return api.post("/uploads/avatar", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};

@@ -23,4 +23,6 @@ export type Place = {
   latitude: number;
   longitude: number;
   distance_km: number;
+  category?: string;
+  map_url?: string;
 };

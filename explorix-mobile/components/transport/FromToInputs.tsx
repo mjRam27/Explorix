@@ -6,6 +6,8 @@ type Props = {
   to: string;
   onChangeFrom: (v: string) => void;
   onChangeTo: (v: string) => void;
+  onFocusFrom: () => void;
+  onFocusTo: () => void;
   date: Date;
   onPressDate: () => void;
   onSearch: () => void;
@@ -17,6 +19,8 @@ export default function FromToInputs({
   to,
   onChangeFrom,
   onChangeTo,
+  onFocusFrom,
+  onFocusTo,
   date,
   onPressDate,
   onSearch,
@@ -32,6 +36,7 @@ export default function FromToInputs({
             placeholderTextColor="#999"
             value={from}
             onChangeText={onChangeFrom}
+            onFocus={onFocusFrom}
             style={styles.input}
           />
 
@@ -40,6 +45,7 @@ export default function FromToInputs({
             placeholderTextColor="#999"
             value={to}
             onChangeText={onChangeTo}
+            onFocus={onFocusTo}
             style={styles.input}
           />
         </View>

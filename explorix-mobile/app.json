@@ -17,6 +17,9 @@
     ],
     "android": {
       "package": "com.anonymous.explorix"
+    },
+    "ios": {
+      "bundleIdentifier": "com.anonymous.explorix"
     }
   }
 }

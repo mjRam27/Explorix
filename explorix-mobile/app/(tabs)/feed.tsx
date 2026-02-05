@@ -12,6 +12,7 @@ export default function FeedScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(true);
+  const [lastFetchAt, setLastFetchAt] = useState<number>(0);
 
   const refreshFeed = useCallback(async (showSpinner = false) => {
     try {
@@ -25,6 +26,7 @@ export default function FeedScreen() {
       setPosts(items);
       setCursor(res.data.next_cursor);
       setHasMore(!!res.data.next_cursor);
+      setLastFetchAt(Date.now());
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -45,8 +47,12 @@ export default function FeedScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      const now = Date.now();
+      if (posts.length > 0 && now - lastFetchAt < 180000) {
+        return;
+      }
       refreshFeed(posts.length === 0);
-    }, [refreshFeed])
+    }, [refreshFeed, posts.length, lastFetchAt])
   );
 
   if (loading) {

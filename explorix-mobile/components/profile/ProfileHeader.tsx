@@ -8,6 +8,7 @@ type Props = {
   avatarUrl?: string | null;
   onOpenSettings: () => void;
   onAddPost: () => void;
+  onEditProfile: () => void;
 };
 
 export default function ProfileHeader({
@@ -17,6 +18,7 @@ export default function ProfileHeader({
   avatarUrl,
   onOpenSettings,
   onAddPost,
+  onEditProfile,
 }: Props) {
   return (
     <View style={styles.container}>
@@ -57,7 +59,7 @@ export default function ProfileHeader({
       {bio ? <Text style={styles.bio}>{bio}</Text> : null}
 
       <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.actionBtn}>
+        <TouchableOpacity style={styles.actionBtn} onPress={onEditProfile}>
           <Text style={styles.actionText}>Edit profile</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionBtn}>
