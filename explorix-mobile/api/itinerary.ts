@@ -43,5 +43,26 @@ export const createAutoItinerary = (payload: {
   style: "adventurous" | "relaxing" | "fun";
 }) => api.post("/itinerary/auto", payload);
 
+export const createAutoItineraryNearby = (payload: {
+  lat: number;
+  lon: number;
+  radiusKm: number;
+  days: number;
+  category?: string | null;
+}) =>
+  api.post("/itinerary/auto/nearby", {
+    lat: payload.lat,
+    lon: payload.lon,
+    radius_km: payload.radiusKm,
+    days: payload.days,
+    category: payload.category ?? undefined,
+  });
+
 export const saveDraftItinerary = (draft: any) =>
   api.post("/itinerary/add", { draft });
+
+export const deleteItinerary = (id: string) =>
+  api.delete(`/itinerary/${id}`);
+
+export const updateItinerary = (id: string, payload: any) =>
+  api.patch(`/itinerary/${id}`, payload);

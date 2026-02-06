@@ -10,6 +10,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
+import { useLocalSearchParams } from "expo-router";
 
 import ExploreMap from "../../components/explore/ExploreMap";
 import PlaceSheet from "../../components/explore/PlaceSheet";
@@ -19,6 +20,7 @@ import RadiusSlider from "../../components/explore/RadiusSlider";
 
 import { Place } from "../../components/explore/types";
 import { getNearbyPlaces, searchPlaces, getRoute } from "../../api/places";
+import { addNextStop } from "../../utils/nextStops";
 
 type Category = {
   key: string;
@@ -62,9 +64,19 @@ export default function ExploreScreen() {
     longitude: number;
     heading?: number | null;
   } | null>(null);
+  const [pendingRoutePlace, setPendingRoutePlace] = useState<Place | null>(null);
 
   const locationWatchRef = useRef<Location.LocationSubscription | null>(null);
   const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const params = useLocalSearchParams();
+  const lastHandledPlaceId = useRef<string | null>(null);
+  const placeIdParam = typeof params?.placeId === "string" ? params.placeId : undefined;
+  const placeLatParam = typeof params?.placeLat === "string" ? params.placeLat : undefined;
+  const placeLngParam = typeof params?.placeLng === "string" ? params.placeLng : undefined;
+  const placeTitleParam = typeof params?.placeTitle === "string" ? params.placeTitle : undefined;
+  const placeCategoryParam =
+    typeof params?.placeCategory === "string" ? params.placeCategory : undefined;
+  const autoRouteParam = typeof params?.autoRoute === "string" ? params.autoRoute : undefined;
 
   useEffect(() => {
     let isMounted = true;
@@ -123,6 +135,50 @@ export default function ExploreScreen() {
       locationWatchRef.current = null;
     };
   }, [followUser]);
+
+  useEffect(() => {
+    if (!placeIdParam) return;
+    if (lastHandledPlaceId.current === placeIdParam) return;
+
+    const place: Place = {
+      id: Number(placeIdParam),
+      title: placeTitleParam ?? "Selected place",
+      latitude: Number(placeLatParam),
+      longitude: Number(placeLngParam),
+      distance_km: 0,
+      category: placeCategoryParam ?? undefined,
+    };
+
+    if (!Number.isFinite(place.latitude) || !Number.isFinite(place.longitude)) {
+      return;
+    }
+
+    lastHandledPlaceId.current = placeIdParam;
+    setSelectedPlace(place);
+    setFollowUser(false);
+    setRegion((prev) => ({
+      ...prev,
+      latitude: place.latitude,
+      longitude: place.longitude,
+    }));
+
+    if (autoRouteParam === "1") {
+      setPendingRoutePlace(place);
+    }
+  }, [
+    placeIdParam,
+    placeLatParam,
+    placeLngParam,
+    placeTitleParam,
+    placeCategoryParam,
+    autoRouteParam,
+  ]);
+
+  useEffect(() => {
+    if (!pendingRoutePlace || !userLocation) return;
+    handleNavigate(pendingRoutePlace);
+    setPendingRoutePlace(null);
+  }, [pendingRoutePlace, userLocation]);
 
   useEffect(() => {
     const center = userLocation ?? {
@@ -327,7 +383,16 @@ export default function ExploreScreen() {
         onExpand={() => setSheetExpanded(true)}
         onCollapse={() => setSheetExpanded(false)}
         onNavigate={handleNavigate}
-        onAddStop={() => {}}
+        onAddStop={async (place) => {
+          await addNextStop({
+            id: place.id,
+            title: place.title,
+            latitude: place.latitude,
+            longitude: place.longitude,
+            category: place.category ?? null,
+          });
+          Alert.alert("Added", "Saved to Next Stop list.");
+        }}
         onSelectPlace={(place) => {
           setSelectedPlace(place);
           setFollowUser(false);
