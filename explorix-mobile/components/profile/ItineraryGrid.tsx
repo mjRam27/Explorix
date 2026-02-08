@@ -43,6 +43,13 @@ type Row = {
   places: string[];
 };
 
+function countryCodeToFlag(code: string): string {
+  const normalized = String(code || "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalized)) return "";
+  const points = [...normalized].map((c) => 127397 + c.charCodeAt(0));
+  return String.fromCodePoint(...points);
+}
+
 export default function ItineraryGrid() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<Row[]>([]);
@@ -155,7 +162,9 @@ export default function ItineraryGrid() {
     <View style={styles.container}>
       {grouped.map(([group, items]) => (
         <View key={group} style={styles.groupWrap}>
-          <Text style={styles.groupTitle}>{group}</Text>
+          <Text style={styles.groupTitle}>
+            {countryCodeToFlag(group) ? `${countryCodeToFlag(group)} ${group}` : group}
+          </Text>
           {items.map((item) => (
             <View key={item.id} style={styles.card}>
               <Pressable
