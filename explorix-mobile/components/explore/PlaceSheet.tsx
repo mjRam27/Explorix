@@ -231,6 +231,8 @@ const styles = StyleSheet.create({
   },
   detailActions: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 8,
     marginTop: 12,
   },
   detailMetaRow: {
@@ -244,9 +246,10 @@ const styles = StyleSheet.create({
   actionBtn: {
     backgroundColor: "#0f9d58",
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderRadius: 10,
     marginRight: 8,
+    minWidth: 100,
   },
   actionText: {
     color: "#fff",

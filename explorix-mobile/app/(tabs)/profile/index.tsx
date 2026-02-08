@@ -32,6 +32,7 @@ type User = {
   followers_count?: number;
   following_count?: number;
   posts_count?: number;
+  travelled_count?: number;
 };
 
 export default function ProfileScreen() {
@@ -245,6 +246,7 @@ const handleLogout = () => {
           posts={posts.length || user.posts_count || 0}
           followers={user.followers_count ?? 0}
           following={user.following_count ?? 0}
+          travelled={user.travelled_count ?? 0}
         />
 
 

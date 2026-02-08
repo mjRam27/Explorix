@@ -44,6 +44,8 @@ type ItineraryListItem = {
   duration_days?: number;
   start_date?: string | null;
   end_date?: string | null;
+  travel_style?: string | null;
+  tags?: string[] | null;
 };
 
 type EnrichedPlace = {
@@ -70,6 +72,8 @@ type ItineraryDetail = {
   title: string;
   destination: string;
   duration_days: number;
+  travel_style?: string | null;
+  tags?: string[] | null;
   days: EnrichedDay[];
 };
 
@@ -261,6 +265,8 @@ export default function ItineraryScreen() {
           duration_days: it.duration_days ?? null,
           start_date: it.start_date ?? null,
           end_date: it.end_date ?? null,
+          travel_style: it.travel_style ?? null,
+          tags: Array.isArray(it.tags) ? it.tags : [],
         }))
       );
     } finally {
@@ -351,11 +357,18 @@ export default function ItineraryScreen() {
           lon: current.coords.longitude,
           radiusKm,
           days,
+          style: autoStyle,
           category: nearbyCategories.length
             ? nearbyCategories.join(",")
             : null,
         });
-        setDraft(res.data);
+        setDraft({
+          ...res.data,
+          travel_style: res.data?.travel_style ?? autoStyle,
+          selected_categories:
+            res.data?.selected_categories ??
+            (nearbyCategories.length ? nearbyCategories : []),
+        });
       } else {
         if (!autoDestination.trim()) return;
         const res = await createAutoItinerary({
@@ -367,7 +380,13 @@ export default function ItineraryScreen() {
             : null,
           start_date: smartStartDate || null,
         });
-        setDraft(res.data);
+        setDraft({
+          ...res.data,
+          travel_style: res.data?.travel_style ?? autoStyle,
+          selected_categories:
+            res.data?.selected_categories ??
+            (destinationCategories.length ? destinationCategories : []),
+        });
       }
     } finally {
       await wait(1200);
@@ -412,6 +431,25 @@ export default function ItineraryScreen() {
     setDraft(next);
     setDraftSearch("");
     setDraftResults([]);
+  };
+
+  const removeDraftPlace = (
+    dayIndex: number,
+    slot: "morning" | "afternoon" | "evening",
+    placeId: number
+  ) => {
+    setDraft((prev: any) => {
+      if (!prev?.days?.[dayIndex]?.slots?.[slot]) return prev;
+      const next = { ...prev };
+      next.days = [...prev.days];
+      const day = { ...next.days[dayIndex] };
+      day.slots = { ...day.slots };
+      day.slots[slot] = (day.slots[slot] ?? []).filter(
+        (p: any) => p.place_id !== placeId
+      );
+      next.days[dayIndex] = day;
+      return next;
+    });
   };
 
   const saveDraft = async () => {
@@ -822,6 +860,23 @@ export default function ItineraryScreen() {
               {draft && (
                 <View style={styles.draftCard}>
                   <Text style={styles.sectionTitle}>Draft plan</Text>
+                  <View style={styles.draftMetaWrap}>
+                    {!!draft.travel_style && (
+                      <View style={styles.detailBadge}>
+                        <Text style={styles.detailBadgeText}>
+                          STYLE: {String(draft.travel_style).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    {Array.isArray(draft.selected_categories) &&
+                      draft.selected_categories.slice(0, 4).map((cat: string) => (
+                        <View key={cat} style={styles.detailBadge}>
+                          <Text style={styles.detailBadgeText}>
+                            {String(cat).toUpperCase()}
+                          </Text>
+                        </View>
+                      ))}
+                  </View>
                   {draft.days?.map((day: any, dayIndex: number) => (
                     <View key={day.day} style={styles.dayBlock}>
                       <Text style={styles.dayTitle}>Day {day.day}</Text>
@@ -830,22 +885,26 @@ export default function ItineraryScreen() {
                           <View key={slot} style={styles.slotBlock}>
                             <View style={styles.slotHeader}>
                               <Text style={styles.slotTitle}>{slot}</Text>
-                              <TouchableOpacity
-                                onPress={() =>
-                                  setActiveSlot({ dayIndex, slot })
-                                }
-                              >
-                                <Ionicons
-                                  name="add-circle"
-                                  size={18}
-                                  color="#0f9d58"
-                                />
-                              </TouchableOpacity>
                             </View>
                             {(day.slots?.[slot] ?? []).map((p: any) => (
-                              <Text key={p.place_id} style={styles.placeName}>
-                                {p.name}
-                              </Text>
+                              <View key={p.place_id} style={styles.placeRow}>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={styles.placeName}>{p.name}</Text>
+                                  {!!p.category && (
+                                    <Text style={styles.placeMeta}>
+                                      {p.category}
+                                    </Text>
+                                  )}
+                                </View>
+                                <TouchableOpacity
+                                  style={styles.iconTrashBtn}
+                                  onPress={() =>
+                                    removeDraftPlace(dayIndex, slot, p.place_id)
+                                  }
+                                >
+                                  <Ionicons name="remove" size={14} color="#94a3b8" />
+                                </TouchableOpacity>
+                              </View>
                             ))}
                           </View>
                         )
@@ -1048,6 +1107,22 @@ export default function ItineraryScreen() {
                     <Text style={styles.planLocation}>
                       {(it.destination ?? "Unknown destination").toUpperCase()}
                     </Text>
+                    <View style={styles.metaTagRow}>
+                      {!!it.travel_style && (
+                        <View style={styles.detailBadge}>
+                          <Text style={styles.detailBadgeText}>
+                            {it.travel_style.toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      {(it.tags ?? []).slice(0, 2).map((tag) => (
+                        <View key={`${it.id}-${tag}`} style={styles.detailBadge}>
+                          <Text style={styles.detailBadgeText}>
+                            {String(tag).toUpperCase()}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
                   </View>
                   <Ionicons
                     name={selectedId === it.id ? "chevron-up" : "chevron-down"}
@@ -1098,6 +1173,22 @@ export default function ItineraryScreen() {
                   <Text style={styles.detailLocation}>
                     {(detailLocation ?? detail.destination).toUpperCase()}
                   </Text>
+                  <View style={styles.metaTagRow}>
+                    {!!detail.travel_style && (
+                      <View style={styles.detailBadge}>
+                        <Text style={styles.detailBadgeText}>
+                          {detail.travel_style.toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    {(detail.tags ?? []).slice(0, 4).map((tag) => (
+                      <View key={`${detail.id}-${tag}`} style={styles.detailBadge}>
+                        <Text style={styles.detailBadgeText}>
+                          {String(tag).toUpperCase()}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
                   <TouchableOpacity
                     style={styles.detailCalendarBtn}
@@ -1486,6 +1577,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#94a3b8",
     fontWeight: "700",
+  },
+  metaTagRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 6,
+  },
+  draftMetaWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 10,
   },
   detailTrashBtn: {
     width: 36,

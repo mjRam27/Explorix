@@ -46,6 +46,7 @@ export default function ExploreScreen() {
   const [searchText, setSearchText] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [suggestions, setSuggestions] = useState<Place[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [routeCoords, setRouteCoords] = useState<
     { latitude: number; longitude: number }[]
@@ -221,6 +222,7 @@ export default function ExploreScreen() {
     const query = searchText.trim().toLowerCase();
     if (!query || query.length < 2) {
       setSuggestions([]);
+      setShowSuggestions(false);
       if (!searchText.trim()) {
         setActiveSearch("");
       }
@@ -232,6 +234,7 @@ export default function ExploreScreen() {
       .filter((p) => p.title?.toLowerCase().includes(query))
       .slice(0, 8);
     setSuggestions(localMatches);
+    setShowSuggestions(true);
 
     searchTimerRef.current = setTimeout(() => {
       searchPlaces(searchText.trim())
@@ -354,7 +357,10 @@ export default function ExploreScreen() {
       <View style={styles.searchOverlay}>
         <SearchBar
           value={searchText}
-          onChange={setSearchText}
+          onChange={(value: string) => {
+            setSearchText(value);
+            setShowSuggestions(true);
+          }}
           onSearch={() => {
             Keyboard.dismiss();
             const match = suggestions.find(
@@ -370,11 +376,13 @@ export default function ExploreScreen() {
               }));
             }
             setActiveSearch(searchText);
+            setSuggestions([]);
+            setShowSuggestions(false);
             setShowRadius(false);
           }}
         />
 
-        {!!suggestions.length && (
+        {showSuggestions && !!suggestions.length && (
           <View style={styles.suggestionBox}>
             {suggestions.map((item) => (
               <TouchableOpacity
@@ -384,6 +392,7 @@ export default function ExploreScreen() {
                   setSearchText(item.title);
                   setActiveSearch(item.title);
                   setSuggestions([]);
+                  setShowSuggestions(false);
                   if (hasValidCoords(item)) {
                     setSelectedPlace(item);
                     setRouteCoords([]);

@@ -4,18 +4,21 @@ type Props = {
   posts: number;
   followers: number;
   following: number;
+  travelled: number;
 };
 
 export default function ProfileStats({
   posts,
   followers,
   following,
+  travelled,
 }: Props) {
   return (
     <View style={styles.container}>
       <Stat label="Posts" value={posts} />
       <Stat label="Followers" value={followers} />
       <Stat label="Following" value={following} />
+      <Stat label="Travelled" value={travelled} />
     </View>
   );
 }

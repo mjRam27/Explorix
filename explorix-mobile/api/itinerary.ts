@@ -50,6 +50,7 @@ export const createAutoItineraryNearby = (payload: {
   lon: number;
   radiusKm: number;
   days: number;
+  style: "adventurous" | "relaxing" | "fun";
   category?: string | null;
 }) =>
   api.post("/itinerary/auto/nearby", {
@@ -57,6 +58,7 @@ export const createAutoItineraryNearby = (payload: {
     lon: payload.lon,
     radius_km: payload.radiusKm,
     days: payload.days,
+    style: payload.style,
     category: payload.category ?? undefined,
   });
 
