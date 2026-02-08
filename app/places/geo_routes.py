@@ -9,6 +9,39 @@ import requests
 
 router = APIRouter(prefix="/geo", tags=["Geo"])
 
+MAIN_CATEGORIES = {
+    "food",
+    "services",
+    "nature",
+    "culture",
+    "shopping",
+    "stay",
+    "entertainment",
+    "sports",
+}
+
+SUBCATEGORY_MAIN_CATEGORY_MAP = {
+    "events": "entertainment",
+    "nightlife": "entertainment",
+    "wellness": "stay",
+    "normal": "services",
+}
+
+
+def _split_categories(raw: str | None) -> tuple[list[str], list[str]]:
+    if not raw:
+        return [], []
+
+    canonical: list[str] = []
+    keywords: list[str] = []
+    for token in [c.strip().lower() for c in raw.split(",") if c.strip()]:
+        mapped = SUBCATEGORY_MAIN_CATEGORY_MAP.get(token, token)
+        if mapped in MAIN_CATEGORIES:
+            canonical.append(mapped)
+        else:
+            keywords.append(token)
+    return canonical, keywords
+
 @router.get("/nearby")
 async def nearby_features(
     lat: float,
@@ -55,9 +88,17 @@ async def nearby_features(
         "limit": limit,
     }
 
-    if category:
-        sql += " AND category ILIKE :category"
-        params["category"] = f"%{category}%"
+    canonical_categories, keyword_filters = _split_categories(category)
+    if canonical_categories:
+        sql += " AND main_category = ANY(:main_categories)"
+        params["main_categories"] = canonical_categories
+
+    if keyword_filters:
+        sql += " AND (" + " OR ".join(
+            [f"category ILIKE :cat{i}" for i in range(len(keyword_filters))]
+        ) + ")"
+        for i, token in enumerate(keyword_filters):
+            params[f"cat{i}"] = f"%{token}%"
 
     sql += " ORDER BY distance_km LIMIT :limit"
 

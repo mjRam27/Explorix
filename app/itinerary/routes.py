@@ -2,7 +2,6 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
-from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from uuid import UUID
@@ -21,13 +20,58 @@ from itinerary.models import Itinerary
 from core.dependencies import get_current_user
 from schemas.itinerary_draft import ItineraryDraftRequest
 from schemas.itinerary_auto import ItineraryAutoRequest, ItineraryAutoNearbyRequest
-from places.models import Place
-from sqlalchemy import or_
-
-
-
+from schemas.itinerary_next_stop import NextStopItem
 router = APIRouter(prefix="/itinerary", tags=["Itinerary"])
 service = ItineraryService()
+NEXT_STOPS_TTL_SECONDS = 60 * 60 * 24 * 7
+
+STYLE_SCORE_COLUMN = {
+    "adventurous": "adventure_score",
+    "relaxing": "relaxing_score",
+    "fun": "fun_score",
+}
+
+MAIN_CATEGORIES = {
+    "food",
+    "services",
+    "nature",
+    "culture",
+    "shopping",
+    "stay",
+    "entertainment",
+    "sports",
+}
+
+SUBCATEGORY_MAIN_CATEGORY_MAP = {
+    "events": "entertainment",
+    "nightlife": "entertainment",
+    "wellness": "stay",
+    "normal": "services",
+}
+
+
+def _split_categories(raw: str | None) -> tuple[list[str], list[str]]:
+    if not raw:
+        return [], []
+
+    canonical: list[str] = []
+    keywords: list[str] = []
+    for token in [c.strip().lower() for c in raw.split(",") if c.strip()]:
+        mapped = SUBCATEGORY_MAIN_CATEGORY_MAP.get(token, token)
+        if mapped in MAIN_CATEGORIES:
+            canonical.append(mapped)
+        else:
+            keywords.append(token)
+    return canonical, keywords
+
+
+def _score_column_for_nearby(canonical: list[str], keywords: list[str]) -> str:
+    pool = set(canonical + keywords)
+    if {"nature", "sports", "hike", "adventure"} & pool:
+        return "adventure_score"
+    if {"stay", "food", "wellness", "spa"} & pool:
+        return "relaxing_score"
+    return "fun_score"
 
 
 @router.post("/", response_model=ItineraryResponse)
@@ -79,40 +123,106 @@ async def add_itinerary_from_draft(
     }
 
 
+@router.get("/next-stops")
+async def get_next_stops(
+    user=Depends(get_current_user),
+):
+    cache_key = f"itinerary:{user.id}:next_stops"
+    cached = get_cached_json(cache_key)
+    if cached is None:
+        return []
+    return cached
+
+
+@router.post("/next-stops")
+async def add_next_stop(
+    req: NextStopItem,
+    user=Depends(get_current_user),
+):
+    cache_key = f"itinerary:{user.id}:next_stops"
+    existing = get_cached_json(cache_key)
+    current = existing if isinstance(existing, list) else []
+    deduped = [item for item in current if item.get("id") != req.id]
+    next_list = [req.model_dump()] + deduped
+    cache_json(cache_key, next_list, ttl=NEXT_STOPS_TTL_SECONDS)
+    return next_list
+
+
+@router.delete("/next-stops/{stop_id}")
+async def remove_next_stop(
+    stop_id: int,
+    user=Depends(get_current_user),
+):
+    cache_key = f"itinerary:{user.id}:next_stops"
+    existing = get_cached_json(cache_key)
+    current = existing if isinstance(existing, list) else []
+    next_list = [item for item in current if item.get("id") != stop_id]
+    cache_json(cache_key, next_list, ttl=NEXT_STOPS_TTL_SECONDS)
+    return next_list
+
+
 @router.post("/auto")
 async def auto_itinerary(
     req: ItineraryAutoRequest,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    style_map = {
-        "adventurous": ["nature", "adventure", "trail", "hike", "mountain", "park"],
-        "relaxing": ["spa", "park", "nature", "lake", "beach", "wellness"],
-        "fun": ["entertainment", "theme", "nightlife", "museum", "shopping", "food"],
-    }
-
-    keywords = style_map.get(req.style, [])
     limit = max(3, min(60, req.days * 3))
+    score_column = STYLE_SCORE_COLUMN.get(req.style, "fun_score")
 
-    stmt = select(Place).where(
-        or_(
-            Place.city.ilike(f"%{req.destination}%"),
-            Place.state.ilike(f"%{req.destination}%")
-        )
+    sql = f"""
+    SELECT
+        id,
+        title,
+        category
+    FROM poi
+    WHERE (
+        city ILIKE :destination
+        OR state ILIKE :destination
+        OR country_code ILIKE :destination_cc
     )
+    """
 
-    if keywords:
-        keyword_filters = [Place.category.ilike(f"%{k}%") for k in keywords]
-        stmt = stmt.where(or_(*keyword_filters))
+    params = {
+        "destination": f"%{req.destination}%",
+        "destination_cc": req.destination.upper(),
+        "limit": limit,
+    }
+    canonical_categories, keyword_filters = _split_categories(req.category)
+    if canonical_categories:
+        sql += " AND main_category = ANY(:main_categories)"
+        params["main_categories"] = canonical_categories
 
-    stmt = stmt.order_by(Place.rating.desc().nullslast()).limit(limit)
-    result = await db.execute(stmt)
-    places = result.scalars().all()
+    if keyword_filters:
+        sql += " AND (" + " OR ".join(
+            [f"category ILIKE :cat{i}" for i in range(len(keyword_filters))]
+        ) + ")"
+        for i, token in enumerate(keyword_filters):
+            params[f"cat{i}"] = f"%{token}%"
+
+    sql += f"""
+    ORDER BY
+        COALESCE({score_column}, 0) DESC,
+        COALESCE(rating, 0) DESC,
+        COALESCE(reviews_count, 0) DESC
+    LIMIT :limit
+    """
+
+    result = await db.execute(text(sql), params)
+    places = result.fetchall()
 
     if not places:
-        fallback_stmt = select(Place).order_by(Place.rating.desc().nullslast()).limit(limit)
-        fallback_result = await db.execute(fallback_stmt)
-        places = fallback_result.scalars().all()
+        fallback_sql = f"""
+        SELECT id, title, category
+        FROM poi
+        ORDER BY
+            COALESCE({score_column}, 0) DESC,
+            COALESCE(rating, 0) DESC,
+            COALESCE(reviews_count, 0) DESC
+        LIMIT :limit
+        """
+        fallback_result = await db.execute(text(fallback_sql), {"limit": limit})
+        places = fallback_result.fetchall()
 
     slots = ["morning", "afternoon", "evening"]
     days = []
@@ -126,15 +236,15 @@ async def auto_itinerary(
             },
         })
 
-    for idx, place in enumerate(places):
+    for idx, row in enumerate(places):
         day_idx = idx // 3
         if day_idx >= req.days:
             break
         slot = slots[idx % 3]
         days[day_idx]["slots"][slot].append({
-            "place_id": place.id,
-            "name": place.title,
-            "category": place.category,
+            "place_id": row.id,
+            "name": row.title,
+            "category": row.category,
         })
 
     return {
@@ -152,8 +262,10 @@ async def auto_itinerary_nearby(
     user=Depends(get_current_user)
 ):
     limit = max(3, min(60, req.days * 3))
+    canonical_categories, keyword_filters = _split_categories(req.category)
+    score_column = _score_column_for_nearby(canonical_categories, keyword_filters)
 
-    sql = """
+    sql = f"""
     SELECT
         id,
         title,
@@ -176,16 +288,24 @@ async def auto_itinerary_nearby(
         "limit": limit,
     }
 
-    if req.category:
-        categories = [c.strip() for c in req.category.split(",") if c.strip()]
-        if categories:
-            sql += " AND (" + " OR ".join(
-                [f"category ILIKE :cat{i}" for i in range(len(categories))]
-            ) + ")"
-            for i, cat in enumerate(categories):
-                params[f"cat{i}"] = f"%{cat}%"
+    if canonical_categories:
+        sql += " AND main_category = ANY(:main_categories)"
+        params["main_categories"] = canonical_categories
 
-    sql += " ORDER BY RANDOM() LIMIT :limit"
+    if keyword_filters:
+        sql += " AND (" + " OR ".join(
+            [f"category ILIKE :cat{i}" for i in range(len(keyword_filters))]
+        ) + ")"
+        for i, cat in enumerate(keyword_filters):
+            params[f"cat{i}"] = f"%{cat}%"
+
+    sql += f"""
+    ORDER BY
+        COALESCE({score_column}, 0) DESC,
+        COALESCE(rating, 0) DESC,
+        COALESCE(reviews_count, 0) DESC
+    LIMIT :limit
+    """
     result = await db.execute(text(sql), params)
     rows = result.fetchall()
 
