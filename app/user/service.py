@@ -5,8 +5,10 @@ from sqlalchemy import select, func
 from auth.models import User
 from posts.models import Post
 from social.models import UserFollow
+from itinerary.models import Itinerary
 from schemas.user_profile import UpdateProfileRequest
 from utils.gcs import get_signed_url
+from datetime import date
 
 async def get_my_profile(db: AsyncSession, user_id):
     followers = await db.scalar(
@@ -19,6 +21,12 @@ async def get_my_profile(db: AsyncSession, user_id):
 
     posts = await db.scalar(
         select(func.count()).where(Post.user_id == user_id)
+    )
+    travelled = await db.scalar(
+        select(func.count(func.distinct(Itinerary.destination))).where(
+            Itinerary.user_id == user_id,
+            Itinerary.end_date < date.today(),
+        )
     )
 
     user = await db.get(User, user_id)
@@ -40,6 +48,7 @@ async def get_my_profile(db: AsyncSession, user_id):
         "followers_count": followers,
         "following_count": following,
         "posts_count": posts,
+        "travelled_count": travelled or 0,
     }
 
 
@@ -58,6 +67,12 @@ async def get_public_profile(db: AsyncSession, viewer_id, profile_user_id):
 
     posts = await db.scalar(
         select(func.count()).where(Post.user_id == profile_user_id)
+    )
+    travelled = await db.scalar(
+        select(func.count(func.distinct(Itinerary.destination))).where(
+            Itinerary.user_id == profile_user_id,
+            Itinerary.end_date < date.today(),
+        )
     )
 
     is_following = await db.scalar(
@@ -83,6 +98,7 @@ async def get_public_profile(db: AsyncSession, viewer_id, profile_user_id):
         "followers_count": followers,
         "following_count": following,
         "posts_count": posts,
+        "travelled_count": travelled or 0,
         "is_following": is_following > 0
     }
 

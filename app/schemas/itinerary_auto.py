@@ -14,4 +14,5 @@ class ItineraryAutoNearbyRequest(BaseModel):
     lon: float
     radius_km: int = Field(default=5, ge=1, le=80)
     days: int = Field(..., ge=1, le=14)
+    style: str = Field(default="fun", pattern="^(adventurous|relaxing|fun)$")
     category: str | None = None

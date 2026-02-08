@@ -6,6 +6,7 @@ from datetime import datetime
 
 from posts.models import Post, PostLike, PostSave, PostComment
 from social.models import UserFollow
+from auth.models import User
 from utils.gcs import get_signed_url
 
 
@@ -18,6 +19,7 @@ async def get_following_feed(
     base_stmt = (
         select(
             Post,
+            User,
             (
                 select(func.count(PostLike.id))
                 .where(PostLike.post_id == Post.id)
@@ -37,6 +39,7 @@ async def get_following_feed(
                 PostSave.user_id == current_user_id,
             ).label("is_saved"),
         )
+        .join(User, User.id == Post.user_id)
         .order_by(Post.created_at.desc())
         .limit(limit)
     )
@@ -76,6 +79,15 @@ async def get_following_feed(
         {
             "id": post.id,
             "user_id": post.user_id,
+            "user": {
+                "id": str(user.id),
+                "name": user.name or user.email.split("@")[0],
+                "avatar_url": (
+                    user.avatar_url
+                    if (user.avatar_url and user.avatar_url.startswith(("http://", "https://")))
+                    else (get_signed_url(user.avatar_url) if user.avatar_url else None)
+                ),
+            },
             "media_url": resolve_media_url(post.media_url),
             "media_type": post.media_type,
             "caption": post.caption,
@@ -89,7 +101,7 @@ async def get_following_feed(
             "is_liked": is_liked,
             "is_saved": is_saved,
         }
-        for post, likes_count, comments_count, is_liked, is_saved in rows
+        for post, user, likes_count, comments_count, is_liked, is_saved in rows
     ]
 
 async def get_my_posts_enriched(

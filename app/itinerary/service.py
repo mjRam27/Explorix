@@ -114,6 +114,8 @@ class ItineraryService:
             "title": itinerary.title,
             "destination": itinerary.destination,
             "duration_days": itinerary.duration_days,
+            "travel_style": itinerary.travel_style,
+            "tags": itinerary.tags or [],
             "days": enriched_days
         }
  
@@ -149,6 +151,8 @@ class ItineraryService:
             end_date=start_date + timedelta(days=duration_days - 1),
             duration_days=duration_days,
             days=days,
+            travel_style=normalized.get("travel_style"),
+            tags=normalized.get("selected_categories") or [],
             ai_generated=True
         )
 

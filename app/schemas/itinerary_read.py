@@ -32,4 +32,6 @@ class ItineraryEnrichedResponse(BaseModel):
     title: str
     destination: str
     duration_days: int
+    travel_style: Optional[str] = None
+    tags: Optional[List[str]] = None
     days: List[EnrichedDay]

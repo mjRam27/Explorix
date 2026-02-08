@@ -117,5 +117,7 @@ def normalize_draft_for_persistence(draft: Dict) -> Dict:
     return {
         "destination": destination,
         "title": f"{destination} Trip",
-        "days": normalized_days
+        "days": normalized_days,
+        "travel_style": draft.get("travel_style"),
+        "selected_categories": draft.get("selected_categories") or [],
     }

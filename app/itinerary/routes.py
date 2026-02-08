@@ -250,6 +250,8 @@ async def auto_itinerary(
     return {
         "destination": req.destination,
         "days": days,
+        "travel_style": req.style,
+        "selected_categories": [c.strip() for c in (req.category or "").split(",") if c.strip()],
         "created_by": "backend_auto",
         "editable": True,
     }
@@ -263,13 +265,16 @@ async def auto_itinerary_nearby(
 ):
     limit = max(3, min(60, req.days * 3))
     canonical_categories, keyword_filters = _split_categories(req.category)
-    score_column = _score_column_for_nearby(canonical_categories, keyword_filters)
+    score_column = STYLE_SCORE_COLUMN.get(req.style, "fun_score")
 
     sql = f"""
     SELECT
         id,
         title,
         category,
+        city,
+        state,
+        country_code,
         ST_Y(geo::geometry) AS latitude,
         ST_X(geo::geometry) AS longitude
     FROM poi
@@ -332,9 +337,23 @@ async def auto_itinerary_nearby(
             "category": row.category,
         })
 
+    destination_label = "Nearby"
+    if rows:
+        first = rows[0]
+        city = (first.city or first.state or "").strip() if hasattr(first, "city") else ""
+        cc = (first.country_code or "").strip() if hasattr(first, "country_code") else ""
+        if city and cc:
+            destination_label = f"{city}, {cc}"
+        elif city:
+            destination_label = city
+        elif cc:
+            destination_label = cc
+
     return {
-        "destination": "Nearby",
+        "destination": destination_label,
         "days": days,
+        "travel_style": req.style,
+        "selected_categories": [c.strip() for c in (req.category or "").split(",") if c.strip()],
         "created_by": "backend_nearby",
         "editable": True,
     }
