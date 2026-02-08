@@ -1,4 +1,5 @@
 # transport/departure_service.py
+import os
 import requests
 from db.db_redis import get_cached_departure, cache_departure, redis_client
 
@@ -38,8 +39,8 @@ def fetch_departures(station_id: str, duration: int = 30):
 
 
 def _fetch_and_format_departures(station_id: str, duration: int):
-    # FIXED v6 endpoint
-    url = f"https://v6.vbb.transport.rest/stops/{station_id}/departures"
+    api_base = os.getenv("TRANSPORT_API_BASE", "https://v6.db.transport.rest").rstrip("/")
+    url = f"{api_base}/stops/{station_id}/departures"
     params = {
         "duration": duration,
         "language": "en"

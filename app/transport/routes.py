@@ -2,13 +2,15 @@
 from fastapi import APIRouter, Query
 from typing import Optional
 
-from transport.journey_service import fetch_journey
+from transport.journey_service import (
+    fetch_journey,
+    fetch_station_suggestions,
+    fetch_nearby_stations,
+    seed_stations_from_query,
+)
 from transport.refresh_service import refresh_journey
 from transport.departure_service import fetch_departures
 from transport.route_service import find_shortest_route
-from utils.resolve import get_station_id
-from db.db_mongo import get_station_logs  # helper, not raw client
-from pymongo.collection import Collection
 router = APIRouter(prefix="/transport", tags=["Transport"])
 
 
@@ -20,12 +22,9 @@ def journey(
     departure: Optional[str] = None,
     user_id: Optional[str] = None,
 ):
-    from_id = get_station_id(from_station) if not from_station.isdigit() else from_station
-    to_id = get_station_id(to_station) if not to_station.isdigit() else to_station
-
     return fetch_journey(
-        from_id,
-        to_id,
+        from_station,
+        to_station,
         products,
         departure=departure,
         user_id=user_id
@@ -39,13 +38,27 @@ def refresh(token: str):
 
 @router.get("/stations")
 def suggest_stations(q: str = Query(..., min_length=1)):
-    regex_query = {
-        "name": {
-            "$regex": f"^{q}",
-            "$options": "i"
-        }
+    return fetch_station_suggestions(q, limit=20)
+
+
+@router.get("/stations/nearby")
+def nearby_stations(
+    lat: float,
+    lon: float,
+    results: int = 8,
+    distance: int = 3000,
+):
+    return fetch_nearby_stations(lat=lat, lon=lon, results=results, distance=distance)
+
+
+@router.post("/stations/seed")
+def seed_stations(
+    q: str = Query(..., min_length=2),
+    limit: int = 50,
+):
+    return {
+        "seeded": seed_stations_from_query(q, limit=max(1, min(limit, 100))),
     }
-    return get_station_logs(regex_query)
 
 
 

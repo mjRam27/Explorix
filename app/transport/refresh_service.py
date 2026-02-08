@@ -1,8 +1,10 @@
 # transport/refresh_service.py
+import os
 import requests
 
 def refresh_journey(refresh_token: str):
-    url = "https://v6.vbb.transport.rest/journeys"
+    api_base = os.getenv("TRANSPORT_API_BASE", "https://v6.db.transport.rest").rstrip("/")
+    url = f"{api_base}/journeys"
     params = {
         "refreshToken": refresh_token,
         "stopovers": True,
