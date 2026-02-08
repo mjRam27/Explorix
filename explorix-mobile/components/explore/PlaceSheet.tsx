@@ -26,6 +26,7 @@ type Props = {
   onClearSelection?: () => void;
   onNavigate?: (place: Place) => void;
   onAddStop?: (place: Place) => void;
+  onTransport?: (place: Place) => void;
   onSelectPlace?: (place: Place) => void;
 };
 
@@ -39,6 +40,7 @@ export default function PlaceSheet({
   onClearSelection,
   onNavigate,
   onAddStop,
+  onTransport,
   onSelectPlace,
 }: Props) {
   const translateY = useRef(new Animated.Value(COLLAPSED)).current;
@@ -138,6 +140,12 @@ export default function PlaceSheet({
               >
                 <Text style={styles.secondaryText}>Add next stop</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.secondaryBtn]}
+                onPress={() => onTransport?.(selectedPlace)}
+              >
+                <Text style={styles.secondaryText}>Public transport</Text>
+              </TouchableOpacity>
             </View>
           </View>
         ) : (
@@ -149,6 +157,7 @@ export default function PlaceSheet({
                 place={place}
                 onNavigate={() => onNavigate?.(place)}
                 onAddStop={() => onAddStop?.(place)}
+                onTransport={() => onTransport?.(place)}
                 onSelect={() => onSelectPlace?.(place)}
               />
             ))}

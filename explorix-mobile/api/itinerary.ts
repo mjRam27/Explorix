@@ -41,6 +41,8 @@ export const createAutoItinerary = (payload: {
   destination: string;
   days: number;
   style: "adventurous" | "relaxing" | "fun";
+  category?: string | null;
+  start_date?: string | null;
 }) => api.post("/itinerary/auto", payload);
 
 export const createAutoItineraryNearby = (payload: {
@@ -66,3 +68,19 @@ export const deleteItinerary = (id: string) =>
 
 export const updateItinerary = (id: string, payload: any) =>
   api.patch(`/itinerary/${id}`, payload);
+
+export type NextStop = {
+  id: number;
+  title: string;
+  latitude: number;
+  longitude: number;
+  category?: string | null;
+};
+
+export const getNextStops = () => api.get("/itinerary/next-stops");
+
+export const addNextStop = (payload: NextStop) =>
+  api.post("/itinerary/next-stops", payload);
+
+export const removeNextStop = (id: number) =>
+  api.delete(`/itinerary/next-stops/${id}`);

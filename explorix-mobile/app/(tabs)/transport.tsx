@@ -9,6 +9,8 @@ import {
 } from "react-native";
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
+import * as Location from "expo-location";
 
 import TransportMap from "../../components/transport/TransportMap";
 import JourneySheet from "../../components/transport/JourneySheet";
@@ -20,6 +22,7 @@ import { getJourneys, getStations } from "../../api/transport";
 
 
 export default function TransportScreen() {
+  const params = useLocalSearchParams();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [fromId, setFromId] = useState<string | null>(null);
@@ -36,6 +39,9 @@ export default function TransportScreen() {
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [activeField, setActiveField] = useState<"from" | "to" | null>(null);
+  const [autoLoaded, setAutoLoaded] = useState(false);
+  const [autoSearchMessage, setAutoSearchMessage] = useState<string | null>(null);
+  const [nearestLoading, setNearestLoading] = useState(false);
 
   const normalizeMode = (m?: string) => (m || "").toLowerCase();
 
@@ -68,8 +74,8 @@ export default function TransportScreen() {
     return () => clearTimeout(timer);
   }, [from, to, activeField]);
 
-  const handleSearch = async () => {
-    if (!from.trim() || !to.trim()) {
+  const runJourneySearch = async (fromValue: string, toValue: string) => {
+    if (!fromValue.trim() || !toValue.trim()) {
       Alert.alert("Missing stations", "Please enter From and To");
       return;
     }
@@ -77,8 +83,8 @@ export default function TransportScreen() {
     setLoading(true);
     try {
       const res = await getJourneys({
-        from: from.trim(),
-        to: to.trim(),
+        from: fromValue.trim(),
+        to: toValue.trim(),
         departure: dateTime.toISOString(),
       });
       if (res.data?.status === "error") {
@@ -103,6 +109,75 @@ export default function TransportScreen() {
       setLoading(false);
     }
   };
+  const handleSearch = async () => runJourneySearch(from, to);
+
+  const bootstrapNearestStation = async () => {
+    setNearestLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setAutoSearchMessage("Location permission denied. Please enter From station manually.");
+        return null;
+      }
+      const current = await Location.getCurrentPositionAsync({});
+      const geocode = await Location.reverseGeocodeAsync({
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+      });
+      const city =
+        geocode?.[0]?.city ??
+        geocode?.[0]?.district ??
+        geocode?.[0]?.subregion ??
+        "";
+
+      if (!city) {
+        setAutoSearchMessage("Could not detect nearby city. Please enter From station manually.");
+        return null;
+      }
+
+      const stationRes = await getStations(city);
+      const firstStation = Array.isArray(stationRes.data) ? stationRes.data[0] : null;
+      if (firstStation?.name) {
+        setFrom(firstStation.name);
+        setAutoSearchMessage(null);
+        return firstStation.name as string;
+      }
+
+      setFrom(city);
+      setAutoSearchMessage("Nearest station not found. Using city name as From.");
+      return city;
+    } catch {
+      setAutoSearchMessage("Auto origin failed. Please pick a From station manually.");
+      return null;
+    } finally {
+      setNearestLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const autoTransport = params?.autoTransport === "1";
+    const toName = typeof params?.toName === "string" ? params.toName : "";
+    if (!autoTransport || autoLoaded || !toName) return;
+
+    const bootstrapFromLiveLocation = async () => {
+      setAutoLoaded(true);
+      setTo(toName);
+      let fromCandidate = from;
+
+      try {
+        const nearest = await bootstrapNearestStation();
+        if (nearest) fromCandidate = nearest;
+      } catch {}
+
+      if (fromCandidate.trim()) {
+        await runJourneySearch(fromCandidate, toName);
+      } else {
+        setAutoSearchMessage("Select a From station manually, then tap Search.");
+      }
+    };
+
+    bootstrapFromLiveLocation();
+  }, [params, autoLoaded, from, dateTime]);
 
   return (
     // <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -143,7 +218,19 @@ export default function TransportScreen() {
                 setToId(fromId);
               }}
               onSearch={handleSearch}
+              onUseNearestStation={async () => {
+                const nearest = await bootstrapNearestStation();
+                if (nearest && to.trim()) {
+                  await runJourneySearch(nearest, to);
+                }
+              }}
+              nearestLoading={nearestLoading}
             />
+            {!!autoSearchMessage && (
+              <View style={styles.autoHint}>
+                <Text style={styles.autoHintText}>{autoSearchMessage}</Text>
+              </View>
+            )}
 
             <TransportFilters
               active={mode}
@@ -248,6 +335,21 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     paddingVertical: 6,
     elevation: 6,
+  },
+  autoHint: {
+    marginTop: 8,
+    marginHorizontal: 16,
+    backgroundColor: "#fff7ed",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#fed7aa",
+  },
+  autoHintText: {
+    color: "#9a3412",
+    fontSize: 12,
+    fontWeight: "500",
   },
   suggestionItem: {
     paddingHorizontal: 12,

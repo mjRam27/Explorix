@@ -10,7 +10,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import ExploreMap from "../../components/explore/ExploreMap";
 import PlaceSheet from "../../components/explore/PlaceSheet";
@@ -20,7 +20,7 @@ import RadiusSlider from "../../components/explore/RadiusSlider";
 
 import { Place } from "../../components/explore/types";
 import { getNearbyPlaces, searchPlaces, getRoute } from "../../api/places";
-import { addNextStop } from "../../utils/nextStops";
+import { addNextStop as addNextStopApi } from "../../api/itinerary";
 
 type Category = {
   key: string;
@@ -34,9 +34,14 @@ const CATEGORY_GROUPS: Category[] = [
   { key: "nature", label: "Nature", icon: "leaf" },
   { key: "culture", label: "Culture", icon: "library" },
   { key: "shopping", label: "Shopping", icon: "cart" },
+  { key: "stay", label: "Stay", icon: "bed-outline" },
+  { key: "entertainment", label: "Fun", icon: "musical-notes" },
+  { key: "sports", label: "Sports", icon: "football" },
+  { key: "services", label: "Services", icon: "briefcase" },
 ];
 
 export default function ExploreScreen() {
+  const router = useRouter();
   const [places, setPlaces] = useState<Place[]>([]);
   const [searchText, setSearchText] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
@@ -49,6 +54,7 @@ export default function ExploreScreen() {
   const [routeDistance, setRouteDistance] = useState<string | null>(null);
   const [category, setCategory] = useState("all");
   const [radiusKm, setRadiusKm] = useState(5);
+  const [appliedRadiusKm, setAppliedRadiusKm] = useState(5);
   const [showRadius, setShowRadius] = useState(false);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [followUser, setFollowUser] = useState(true);
@@ -77,6 +83,8 @@ export default function ExploreScreen() {
   const placeCategoryParam =
     typeof params?.placeCategory === "string" ? params.placeCategory : undefined;
   const autoRouteParam = typeof params?.autoRoute === "string" ? params.autoRoute : undefined;
+  const hasValidCoords = (p: { latitude?: number; longitude?: number }) =>
+    Number.isFinite(p.latitude) && Number.isFinite(p.longitude);
 
   useEffect(() => {
     let isMounted = true;
@@ -181,27 +189,37 @@ export default function ExploreScreen() {
   }, [pendingRoutePlace, userLocation]);
 
   useEffect(() => {
+    const t = setTimeout(() => {
+      setAppliedRadiusKm(radiusKm);
+    }, 220);
+    return () => clearTimeout(t);
+  }, [radiusKm]);
+
+  useEffect(() => {
     const center = userLocation ?? {
       latitude: region.latitude,
       longitude: region.longitude,
     };
+    const limit = Math.min(100, Math.max(20, appliedRadiusKm * 2));
 
     getNearbyPlaces({
       lat: center.latitude,
       lon: center.longitude,
-      radiusKm,
+      radiusKm: appliedRadiusKm,
+      limit,
       category,
     })
       .then((res) => setPlaces(res.data))
       .catch(() => setPlaces([]));
-  }, [userLocation, region.latitude, region.longitude, radiusKm, category]);
+  }, [userLocation, region.latitude, region.longitude, appliedRadiusKm, category]);
 
   useEffect(() => {
     if (searchTimerRef.current) {
       clearTimeout(searchTimerRef.current);
     }
 
-    if (!searchText || searchText.trim().length < 2) {
+    const query = searchText.trim().toLowerCase();
+    if (!query || query.length < 2) {
       setSuggestions([]);
       if (!searchText.trim()) {
         setActiveSearch("");
@@ -209,18 +227,43 @@ export default function ExploreScreen() {
       return;
     }
 
+    // Show immediate local suggestions so the list appears even before API returns.
+    const localMatches = places
+      .filter((p) => p.title?.toLowerCase().includes(query))
+      .slice(0, 8);
+    setSuggestions(localMatches);
+
     searchTimerRef.current = setTimeout(() => {
       searchPlaces(searchText.trim())
-        .then((res) => setSuggestions(res.data))
+        .then((res) => {
+          const remote = Array.isArray(res.data)
+            ? res.data
+            : Array.isArray((res.data as any)?.results)
+            ? (res.data as any).results
+            : [];
+          const merged = [...localMatches, ...remote];
+          const deduped: Place[] = [];
+          const seen = new Set<string>();
+          for (const item of merged) {
+            const key = String((item as any)?.id ?? (item as any)?.title ?? "");
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+            deduped.push(item as Place);
+          }
+          setSuggestions(deduped.slice(0, 20));
+        })
         .catch(() => setSuggestions([]));
     }, 300);
-  }, [searchText]);
+  }, [searchText, places]);
 
   const filteredPlaces = places.filter((p) =>
     !activeSearch
       ? true
       : p.title.toLowerCase().includes(activeSearch.toLowerCase())
   );
+  const navigationActive = routeCoords.length > 1 && !!selectedPlace;
+  const visiblePlaces =
+    navigationActive && selectedPlace ? [selectedPlace] : filteredPlaces;
 
   const decodePolyline = (encoded: string) => {
     let index = 0;
@@ -264,6 +307,7 @@ export default function ExploreScreen() {
     if (!userLocation) return;
 
     try {
+      setSelectedPlace(place);
       const res = await getRoute({
         originLat: userLocation.latitude,
         originLng: userLocation.longitude,
@@ -287,17 +331,20 @@ export default function ExploreScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onTouchStart={() => Keyboard.dismiss()}>
       {/* MAP */}
       <ExploreMap
         region={region}
-        places={filteredPlaces}
+        places={visiblePlaces}
         selectedPlace={selectedPlace}
         userLocation={userLocation}
         routeCoords={routeCoords}
         sheetExpanded={sheetExpanded}
         onMarkerPress={(place) => {
           setSelectedPlace(place);
+          setRouteCoords([]);
+          setRouteEta(null);
+          setRouteDistance(null);
           setFollowUser(false);
         }}
         onUserPan={() => setFollowUser(false)}
@@ -310,6 +357,18 @@ export default function ExploreScreen() {
           onChange={setSearchText}
           onSearch={() => {
             Keyboard.dismiss();
+            const match = suggestions.find(
+              (s) => s.title.toLowerCase() === searchText.trim().toLowerCase()
+            );
+            if (match && hasValidCoords(match)) {
+              setSelectedPlace(match);
+              setFollowUser(false);
+              setRegion((prev) => ({
+                ...prev,
+                latitude: match.latitude,
+                longitude: match.longitude,
+              }));
+            }
             setActiveSearch(searchText);
             setShowRadius(false);
           }}
@@ -325,13 +384,20 @@ export default function ExploreScreen() {
                   setSearchText(item.title);
                   setActiveSearch(item.title);
                   setSuggestions([]);
-                  setSelectedPlace(item);
-                  setFollowUser(false);
-                  setRegion((prev) => ({
-                    ...prev,
-                    latitude: item.latitude,
-                    longitude: item.longitude,
-                  }));
+                  if (hasValidCoords(item)) {
+                    setSelectedPlace(item);
+                    setRouteCoords([]);
+                    setRouteEta(null);
+                    setRouteDistance(null);
+                    setFollowUser(false);
+                    setRegion((prev) => ({
+                      ...prev,
+                      latitude: item.latitude,
+                      longitude: item.longitude,
+                    }));
+                  } else {
+                    setSelectedPlace(null);
+                  }
                 }}
               >
                 <Text style={styles.suggestionTitle}>{item.title}</Text>
@@ -351,6 +417,9 @@ export default function ExploreScreen() {
             setCategory(key);
             setActiveSearch("");
             setShowRadius(false);
+            setRouteCoords([]);
+            setRouteEta(null);
+            setRouteDistance(null);
           }}
           onPressRadius={() => {
             Keyboard.dismiss();
@@ -372,7 +441,7 @@ export default function ExploreScreen() {
 
       {/* BOTTOM SHEET */}
       <PlaceSheet
-        places={filteredPlaces}
+        places={visiblePlaces}
         selectedPlace={selectedPlace}
         onClearSelection={() => {
           setSelectedPlace(null);
@@ -384,7 +453,7 @@ export default function ExploreScreen() {
         onCollapse={() => setSheetExpanded(false)}
         onNavigate={handleNavigate}
         onAddStop={async (place) => {
-          await addNextStop({
+          await addNextStopApi({
             id: place.id,
             title: place.title,
             latitude: place.latitude,
@@ -393,8 +462,22 @@ export default function ExploreScreen() {
           });
           Alert.alert("Added", "Saved to Next Stop list.");
         }}
+        onTransport={(place) => {
+          router.push({
+            pathname: "/transport",
+            params: {
+              autoTransport: "1",
+              toName: place.title,
+              destLat: String(place.latitude),
+              destLng: String(place.longitude),
+            },
+          });
+        }}
         onSelectPlace={(place) => {
           setSelectedPlace(place);
+          setRouteCoords([]);
+          setRouteEta(null);
+          setRouteDistance(null);
           setFollowUser(false);
           setRegion((prev) => ({
             ...prev,

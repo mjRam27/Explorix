@@ -34,6 +34,12 @@ export default function ExploreMap({
 
   useEffect(() => {
     if (!selectedPlace || !mapRef.current) return;
+    if (
+      !Number.isFinite(selectedPlace.latitude) ||
+      !Number.isFinite(selectedPlace.longitude)
+    ) {
+      return;
+    }
 
     mapRef.current.animateToRegion(
       {
@@ -87,7 +93,12 @@ export default function ExploreMap({
             </View>
           </Marker>
         )}
-        {places.map((p) => (
+        {places
+          .filter(
+            (p) =>
+              Number.isFinite(p.latitude) && Number.isFinite(p.longitude)
+          )
+          .map((p) => (
           <Marker
             key={p.id}
             coordinate={{
@@ -95,7 +106,11 @@ export default function ExploreMap({
               longitude: p.longitude,
             }}
             title={p.title}
-            description={`${p.distance_km.toFixed(2)} km away`}
+            description={
+              typeof p.distance_km === "number"
+                ? `${p.distance_km.toFixed(2)} km away`
+                : "Distance unavailable"
+            }
             onPress={() => onMarkerPress(p)}
           />
         ))}

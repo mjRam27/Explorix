@@ -1,20 +1,33 @@
 import { View, TextInput, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRef } from "react";
+import { Keyboard } from "react-native";
 
 export function SearchBar({ value, onChange, onSearch }: any) {
+  const inputRef = useRef<TextInput | null>(null);
+
+  const handleSearch = () => {
+    inputRef.current?.blur();
+    Keyboard.dismiss();
+    onSearch?.();
+  };
+
   return (
     <View style={styles.row}>
       <View style={styles.inputBox}>
         <Ionicons name="search" size={18} color="#999" />
         <TextInput
+          ref={inputRef}
           placeholder="Search destinations..."
           value={value}
           onChangeText={onChange}
+          onSubmitEditing={handleSearch}
+          returnKeyType="search"
           style={styles.input}
         />
       </View>
 
-      <TouchableOpacity style={styles.button} onPress={onSearch}>
+      <TouchableOpacity style={styles.button} onPress={handleSearch}>
         <Text style={styles.buttonText}>Search</Text>
       </TouchableOpacity>
     </View>

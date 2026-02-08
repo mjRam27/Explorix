@@ -9,11 +9,17 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import * as Calendar from "expo-calendar";
 import * as Location from "expo-location";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
+import Slider from "@react-native-community/slider";
 import DraggableFlatList, {
   RenderItemParams,
 } from "react-native-draggable-flatlist";
@@ -26,6 +32,8 @@ import {
   saveDraftItinerary,
   deleteItinerary,
   updateItinerary,
+  getNextStops,
+  removeNextStop,
 } from "../../api/itinerary";
 import { searchPlaces } from "../../api/places";
 
@@ -80,9 +88,15 @@ export default function ItineraryScreen() {
   const [autoStyle, setAutoStyle] = useState<
     "adventurous" | "relaxing" | "fun"
   >("fun");
+  const [smartStartDate, setSmartStartDate] = useState("");
+  const [smartStartDateValue, setSmartStartDateValue] = useState(new Date());
+  const [showSmartStartPicker, setShowSmartStartPicker] = useState(false);
+  const [destinationCategories, setDestinationCategories] = useState<string[]>(
+    []
+  );
   const [useNearby, setUseNearby] = useState(false);
   const [nearbyCategories, setNearbyCategories] = useState<string[]>([]);
-  const [nearbyRadius, setNearbyRadius] = useState("5");
+  const [nearbyRadius, setNearbyRadius] = useState(5);
   const [draft, setDraft] = useState<any | null>(null);
   const [draftSearch, setDraftSearch] = useState("");
   const [draftResults, setDraftResults] = useState<any[]>([]);
@@ -95,6 +109,10 @@ export default function ItineraryScreen() {
   const [formDestination, setFormDestination] = useState("");
   const [formStartDate, setFormStartDate] = useState("");
   const [formEndDate, setFormEndDate] = useState("");
+  const [startDateValue, setStartDateValue] = useState(new Date());
+  const [endDateValue, setEndDateValue] = useState(new Date());
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
   const [nextStops, setNextStops] = useState<any[]>([]);
   const [deletingItineraryId, setDeletingItineraryId] = useState<string | null>(
     null
@@ -104,6 +122,7 @@ export default function ItineraryScreen() {
 
   const activeDays = useMemo(() => detail?.days ?? [], [detail]);
   const wait = (ms: number) => new Promise((res) => setTimeout(res, ms));
+  const formatDate = (d: Date) => d.toISOString().slice(0, 10);
   const detailDateRange = useMemo(() => {
     if (!detail?.days?.length) return null;
     const start = detail.days[0]?.date;
@@ -198,11 +217,36 @@ export default function ItineraryScreen() {
     loadNextStops();
   }, [section]);
 
-  const loadNextStops = async () => {
-    const { loadNextStops } = await import("../../utils/nextStops");
-    const stops = await loadNextStops();
-    setNextStops(stops);
-  };
+  useFocusEffect(
+    useMemo(
+      () => () => {
+        loadNextStops();
+      },
+      []
+    )
+  );
+
+  async function loadNextStops() {
+    try {
+      const res = await getNextStops();
+      const list = Array.isArray(res.data) ? res.data : [];
+      if (list.length > 0) {
+        setNextStops(list);
+        return;
+      }
+      const local = await import("../../utils/nextStops");
+      const fallback = await local.loadNextStops();
+      setNextStops(Array.isArray(fallback) ? fallback : []);
+    } catch {
+      try {
+        const local = await import("../../utils/nextStops");
+        const fallback = await local.loadNextStops();
+        setNextStops(Array.isArray(fallback) ? fallback : []);
+      } catch {
+        setNextStops([]);
+      }
+    }
+  }
 
   const loadList = async () => {
     try {
@@ -277,6 +321,9 @@ export default function ItineraryScreen() {
       setFormDestination("");
       setFormStartDate("");
       setFormEndDate("");
+      const today = new Date();
+      setStartDateValue(today);
+      setEndDateValue(today);
       await loadList();
     } finally {
       await wait(1200);
@@ -298,7 +345,7 @@ export default function ItineraryScreen() {
           return;
         }
         const current = await Location.getCurrentPositionAsync({});
-        const radiusKm = Number(nearbyRadius) || 5;
+        const radiusKm = nearbyRadius || 5;
         const res = await createAutoItineraryNearby({
           lat: current.coords.latitude,
           lon: current.coords.longitude,
@@ -315,6 +362,10 @@ export default function ItineraryScreen() {
           destination: autoDestination.trim(),
           days,
           style: autoStyle,
+          category: destinationCategories.length
+            ? destinationCategories.join(",")
+            : null,
+          start_date: smartStartDate || null,
         });
         setDraft(res.data);
       }
@@ -594,14 +645,79 @@ export default function ItineraryScreen() {
                     <Text style={styles.inputLabel}>Where to?</Text>
                     <TextInput
                       placeholder="City or country"
+                      placeholderTextColor="#94a3b8"
                       value={autoDestination}
                       onChangeText={setAutoDestination}
                       style={styles.input}
                     />
+                    <Text style={styles.inputLabel}>Category</Text>
+                    <View style={styles.chipRow}>
+                      {[
+                        "food",
+                        "nature",
+                        "culture",
+                        "shopping",
+                        "sports",
+                        "stay",
+                        "entertainment",
+                        "nightlife",
+                      ].map((cat) => {
+                        const active = destinationCategories.includes(cat);
+                        return (
+                          <TouchableOpacity
+                            key={cat}
+                            style={[
+                              styles.chip,
+                              active && styles.chipActive,
+                            ]}
+                            onPress={() => {
+                              setDestinationCategories((prev) =>
+                                prev.includes(cat)
+                                  ? prev.filter((c) => c !== cat)
+                                  : [...prev, cat]
+                              );
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.chipText,
+                                active && styles.chipTextActive,
+                              ]}
+                            >
+                              {cat}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    <Text style={styles.inputLabel}>Start date</Text>
+                    <TouchableOpacity
+                      style={[styles.input, styles.dateButton]}
+                      onPress={() => setShowSmartStartPicker(true)}
+                    >
+                      <Text style={smartStartDate ? styles.dateText : styles.datePlaceholder}>
+                        {smartStartDate || "Select date"}
+                      </Text>
+                      <Ionicons name="calendar-outline" size={16} color="#6b7280" />
+                    </TouchableOpacity>
+                    {showSmartStartPicker && (
+                      <DateTimePicker
+                        value={smartStartDateValue}
+                        mode="date"
+                        display={Platform.OS === "ios" ? "compact" : "default"}
+                        onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                          if (Platform.OS !== "ios") setShowSmartStartPicker(false);
+                          if (event.type === "dismissed" || !selectedDate) return;
+                          setSmartStartDateValue(selectedDate);
+                          setSmartStartDate(formatDate(selectedDate));
+                          if (Platform.OS === "ios") setShowSmartStartPicker(false);
+                        }}
+                      />
+                    )}
                   </>
                 ) : (
                   <>
-                    <Text style={styles.inputLabel}>Sub-categories</Text>
+                    <Text style={styles.inputLabel}>Category</Text>
                     <View style={styles.chipRow}>
                       {[
                         "food",
@@ -612,6 +728,8 @@ export default function ItineraryScreen() {
                         "nightlife",
                         "sports",
                         "wellness",
+                        "stay",
+                        "entertainment",
                       ].map((cat) => {
                         const active = nearbyCategories.includes(cat);
                         return (
@@ -642,18 +760,22 @@ export default function ItineraryScreen() {
                       })}
                     </View>
                     <Text style={styles.inputLabel}>Radius (km)</Text>
-                    <TextInput
-                      placeholder="5"
+                    <Text style={styles.radiusValue}>{nearbyRadius} km</Text>
+                    <Slider
+                      minimumValue={1}
+                      maximumValue={80}
+                      step={1}
                       value={nearbyRadius}
-                      onChangeText={setNearbyRadius}
-                      keyboardType="numeric"
-                      style={styles.input}
+                      onValueChange={(v) => setNearbyRadius(v)}
+                      minimumTrackTintColor="#0f9d58"
+                      maximumTrackTintColor="#d1d5db"
                     />
                   </>
                 )}
                 <Text style={styles.inputLabel}>How many days?</Text>
                 <TextInput
                   placeholder="Days"
+                  placeholderTextColor="#94a3b8"
                   value={autoDays}
                   onChangeText={setAutoDays}
                   keyboardType="numeric"
@@ -736,6 +858,7 @@ export default function ItineraryScreen() {
                       <Text style={styles.sectionTitle}>Add place</Text>
                       <TextInput
                         placeholder="Search places"
+                        placeholderTextColor="#94a3b8"
                         value={draftSearch}
                         onChangeText={setDraftSearch}
                         style={styles.input}
@@ -771,30 +894,71 @@ export default function ItineraryScreen() {
               <View style={styles.card}>
                 <TextInput
                   placeholder="Trip title"
+                  placeholderTextColor="#94a3b8"
                   value={formTitle}
                   onChangeText={setFormTitle}
                   style={styles.input}
                 />
                 <TextInput
                   placeholder="Destination"
+                  placeholderTextColor="#94a3b8"
                   value={formDestination}
                   onChangeText={setFormDestination}
                   style={styles.input}
                 />
                 <View style={styles.rowInputs}>
-                  <TextInput
-                    placeholder="Start date (YYYY-MM-DD)"
-                    value={formStartDate}
-                    onChangeText={setFormStartDate}
-                    style={[styles.input, styles.inputHalf]}
-                  />
-                  <TextInput
-                    placeholder="End date (YYYY-MM-DD)"
-                    value={formEndDate}
-                    onChangeText={setFormEndDate}
-                    style={[styles.input, styles.inputHalf]}
-                  />
+                  <TouchableOpacity
+                    style={[styles.input, styles.inputHalf, styles.dateButton]}
+                    onPress={() => setShowStartPicker(true)}
+                  >
+                    <Text style={formStartDate ? styles.dateText : styles.datePlaceholder}>
+                      {formStartDate || "Start date"}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={16} color="#6b7280" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.input, styles.inputHalf, styles.dateButton]}
+                    onPress={() => setShowEndPicker(true)}
+                  >
+                    <Text style={formEndDate ? styles.dateText : styles.datePlaceholder}>
+                      {formEndDate || "End date"}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={16} color="#6b7280" />
+                  </TouchableOpacity>
                 </View>
+                {showStartPicker && (
+                  <DateTimePicker
+                    value={startDateValue}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "compact" : "default"}
+                    onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                      if (Platform.OS !== "ios") setShowStartPicker(false);
+                      if (event.type === "dismissed" || !selectedDate) return;
+                      setStartDateValue(selectedDate);
+                      setFormStartDate(formatDate(selectedDate));
+                      if (!formEndDate || new Date(formEndDate) < selectedDate) {
+                        setEndDateValue(selectedDate);
+                        setFormEndDate(formatDate(selectedDate));
+                      }
+                      if (Platform.OS === "ios") setShowStartPicker(false);
+                    }}
+                  />
+                )}
+                {showEndPicker && (
+                  <DateTimePicker
+                    value={endDateValue}
+                    mode="date"
+                    minimumDate={startDateValue}
+                    display={Platform.OS === "ios" ? "compact" : "default"}
+                    onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                      if (Platform.OS !== "ios") setShowEndPicker(false);
+                      if (event.type === "dismissed" || !selectedDate) return;
+                      setEndDateValue(selectedDate);
+                      setFormEndDate(formatDate(selectedDate));
+                      if (Platform.OS === "ios") setShowEndPicker(false);
+                    }}
+                  />
+                )}
                 <TouchableOpacity
                   style={styles.primaryBtn}
                   onPress={handleCreate}
@@ -835,6 +999,15 @@ export default function ItineraryScreen() {
                         onPress={() => goToPlace(stop)}
                       >
                         <Text style={styles.actionText}>Navigate</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.iconTrashBtn}
+                        onPress={async () => {
+                          await removeNextStop(stop.id);
+                          await loadNextStops();
+                        }}
+                      >
+                        <Ionicons name="trash" size={14} color="#94a3b8" />
                       </TouchableOpacity>
                     </View>
                   ))
@@ -1159,6 +1332,24 @@ const styles = StyleSheet.create({
   },
   inputHalf: {
     flex: 1,
+  },
+  dateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dateText: {
+    color: "#111827",
+    fontSize: 14,
+  },
+  datePlaceholder: {
+    color: "#94a3b8",
+    fontSize: 14,
+  },
+  radiusValue: {
+    color: "#111827",
+    fontWeight: "600",
+    marginBottom: 6,
   },
   primaryBtn: {
     backgroundColor: "#0f9d58",

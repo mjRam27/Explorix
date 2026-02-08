@@ -12,6 +12,8 @@ type Props = {
   onPressDate: () => void;
   onSearch: () => void;
   onSwap: () => void;
+  onUseNearestStation?: () => void;
+  nearestLoading?: boolean;
 };
 
 export default function FromToInputs({
@@ -25,6 +27,8 @@ export default function FromToInputs({
   onPressDate,
   onSearch,
   onSwap,
+  onUseNearestStation,
+  nearestLoading,
 }: Props) {
   return (
     <View style={styles.container}>
@@ -66,6 +70,14 @@ export default function FromToInputs({
       </TouchableOpacity>
 
       {/* SEARCH */}
+      {onUseNearestStation && (
+        <TouchableOpacity style={styles.nearestButton} onPress={onUseNearestStation}>
+          <Ionicons name="locate" size={16} color="#0f9d58" />
+          <Text style={styles.nearestText}>
+            {nearestLoading ? "Finding nearest station..." : "Use my nearest station"}
+          </Text>
+        </TouchableOpacity>
+      )}
       <TouchableOpacity style={styles.searchButton} onPress={onSearch}>
         <Text style={styles.searchText}>Search</Text>
       </TouchableOpacity>
@@ -129,6 +141,21 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
+  },
+  nearestButton: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#e8f5ee",
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  nearestText: {
+    color: "#0f9d58",
+    fontWeight: "600",
+    fontSize: 14,
   },
 
   searchText: {

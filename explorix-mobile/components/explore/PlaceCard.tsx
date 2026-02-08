@@ -7,6 +7,7 @@ type Props = {
   place: Place;
   onNavigate?: () => void;
   onAddStop?: () => void;
+  onTransport?: () => void;
   onSelect?: () => void;
 };
 
@@ -14,6 +15,7 @@ export default function PlaceCard({
   place,
   onNavigate,
   onAddStop,
+  onTransport,
   onSelect,
 }: Props) {
   return (
@@ -36,6 +38,11 @@ export default function PlaceCard({
         {onAddStop && (
           <TouchableOpacity onPress={onAddStop} style={{ marginLeft: 12 }}>
             <Ionicons name="add-circle" size={22} color="#1d4ed8" />
+          </TouchableOpacity>
+        )}
+        {onTransport && (
+          <TouchableOpacity onPress={onTransport} style={{ marginLeft: 12 }}>
+            <Ionicons name="bus" size={22} color="#6b7280" />
           </TouchableOpacity>
         )}
       </View>

@@ -5,12 +5,14 @@ export const getNearbyPlaces = (params: {
   lon: number;
   radiusKm: number;
   category?: string | null;
+  limit?: number;
 }) =>
   api.get("/places/geo/nearby", {
     params: {
       lat: params.lat,
       lon: params.lon,
       radius_km: params.radiusKm,
+      limit: params.limit ?? 20,
       category:
         params.category && params.category !== "all"
           ? params.category
