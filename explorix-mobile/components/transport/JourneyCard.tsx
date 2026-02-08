@@ -16,11 +16,21 @@ export default function JourneyCard({
   const depart = formatTime(journey?.departure);
   const arrive = formatTime(journey?.arrival);
   const changes = journey?.changes ?? 0;
+  const firstLine = journey?.legs?.[0]?.line || journey?.line || "Connection";
+  const transferSummary = (journey?.legs ?? [])
+    .slice(0, -1)
+    .map((leg: any, i: number) => {
+      const next = journey?.legs?.[i + 1];
+      if (!next) return null;
+      return `Change at ${leg?.destination || "-"} to ${next?.line || next?.mode || "next"}`;
+    })
+    .filter(Boolean)
+    .slice(0, 2);
 
   return (
     <View style={styles.card}>
       <Text style={styles.title}>
-        Journey option {index + 1}
+        Option {index + 1}  {firstLine}
       </Text>
       <Text style={styles.subtitle}>
         {depart}  {arrive}  {changes} change
@@ -30,6 +40,11 @@ export default function JourneyCard({
           {journey.from}  {journey.to}
         </Text>
       )}
+      {transferSummary.map((t: string, idx: number) => (
+        <Text key={`${t}-${idx}`} style={styles.transfer}>
+          {t}
+        </Text>
+      ))}
     </View>
   );
 }
@@ -53,6 +68,11 @@ const styles = StyleSheet.create({
   route: {
     marginTop: 6,
     color: "#777",
+    fontSize: 12,
+  },
+  transfer: {
+    marginTop: 4,
+    color: "#4b5563",
     fontSize: 12,
   },
 });

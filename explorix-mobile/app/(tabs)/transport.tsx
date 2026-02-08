@@ -6,8 +6,9 @@ import {
   Alert,
   FlatList,
   Text,
+  Keyboard,
 } from "react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import * as Location from "expo-location";
@@ -17,7 +18,7 @@ import JourneySheet from "../../components/transport/JourneySheet";
 import FromToInputs from "../../components/transport/FromToInputs";
 import TransportFilters from "../../components/transport/TransportFilters";
 import DateTimeModal from "../../components/transport/DateTimeModal";
-import { getJourneys, getStations } from "../../api/transport";
+import { getJourneys, getNearbyStations, getStations } from "../../api/transport";
 
 
 
@@ -39,9 +40,23 @@ export default function TransportScreen() {
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [activeField, setActiveField] = useState<"from" | "to" | null>(null);
-  const [autoLoaded, setAutoLoaded] = useState(false);
   const [autoSearchMessage, setAutoSearchMessage] = useState<string | null>(null);
   const [nearestLoading, setNearestLoading] = useState(false);
+  const lastAutoTransportKeyRef = useRef<string>("");
+  const suggestionCacheRef = useRef<Map<string, any[]>>(new Map());
+  const suggestionReqSeqRef = useRef(0);
+  const isStationId = (value: string | null | undefined) =>
+    !!value && (value.includes(":") || /^[0-9]+$/.test(value));
+  const pickNearestWithDistance = (list: any[], _maxMeters: number) => {
+    if (!Array.isArray(list) || list.length === 0) return null;
+    const withDistance = list
+      .filter((x) => typeof x?.distance === "number" && Number.isFinite(x.distance))
+      .sort((a, b) => a.distance - b.distance);
+    if (withDistance.length > 0) {
+      return withDistance[0];
+    }
+    return null;
+  };
 
   const normalizeMode = (m?: string) => (m || "").toLowerCase();
 
@@ -57,19 +72,48 @@ export default function TransportScreen() {
 
   useEffect(() => {
     const query = activeField === "from" ? from : activeField === "to" ? to : "";
-    if (!query || query.trim().length < 2) {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized || normalized.length < 2) {
       setSuggestions([]);
       return;
     }
 
+    const cached = suggestionCacheRef.current.get(normalized);
+    if (cached) {
+      setSuggestions(cached);
+      return;
+    }
+
+    // Fast local fallback from nearest cached prefix while network request runs.
+    let prefixSeeded = false;
+    const closestPrefix = Array.from(suggestionCacheRef.current.keys())
+      .filter((k) => normalized.startsWith(k))
+      .sort((a, b) => b.length - a.length)[0];
+    if (closestPrefix) {
+      const seeded = (suggestionCacheRef.current.get(closestPrefix) || [])
+        .filter((item: any) =>
+          String(item?.name || "").toLowerCase().includes(normalized)
+        )
+        .slice(0, 20);
+      if (seeded.length > 0) {
+        setSuggestions(seeded);
+        prefixSeeded = true;
+      }
+    }
+
+    suggestionReqSeqRef.current += 1;
+    const reqSeq = suggestionReqSeqRef.current;
     const timer = setTimeout(async () => {
       try {
         const res = await getStations(query.trim());
-        setSuggestions(res.data || []);
+        if (reqSeq !== suggestionReqSeqRef.current) return;
+        const data = Array.isArray(res.data) ? res.data : [];
+        suggestionCacheRef.current.set(normalized, data);
+        setSuggestions(data);
       } catch {
-        setSuggestions([]);
+        if (!prefixSeeded) setSuggestions([]);
       }
-    }, 300);
+    }, 220);
 
     return () => clearTimeout(timer);
   }, [from, to, activeField]);
@@ -88,7 +132,15 @@ export default function TransportScreen() {
         departure: dateTime.toISOString(),
       });
       if (res.data?.status === "error") {
-        Alert.alert("No journeys", res.data?.message || "No journey found");
+        const msg = String(res.data?.message || "No journey found");
+        if (msg.includes("503") || msg.toLowerCase().includes("service unavailable")) {
+          Alert.alert(
+            "Provider busy",
+            "Transport provider is temporarily unavailable. Please retry in a few seconds."
+          );
+        } else {
+          Alert.alert("No journeys", msg);
+        }
         setAllJourneys([]);
         setJourneys([]);
         setSearchActive(true);
@@ -109,7 +161,53 @@ export default function TransportScreen() {
       setLoading(false);
     }
   };
-  const handleSearch = async () => runJourneySearch(from, to);
+
+  const resolveInputToStationId = async (value: string): Promise<string | null> => {
+    const raw = value.trim();
+    if (!raw) return null;
+    if (isStationId(raw)) return raw;
+    try {
+      const res = await getStations(raw);
+      const list = Array.isArray(res.data) ? res.data : [];
+      if (list.length === 0) return null;
+      const exact = list.find(
+        (item: any) => String(item?.name || "").trim().toLowerCase() === raw.toLowerCase()
+      );
+      const picked = exact || list[0];
+      return picked?.id ? String(picked.id) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleSearch = async () => {
+    let resolvedFrom = fromId || from;
+    let resolvedTo = toId || to;
+
+    if (!isStationId(resolvedFrom)) {
+      const stationId = await resolveInputToStationId(from);
+      if (stationId) {
+        resolvedFrom = stationId;
+        setFromId(stationId);
+      }
+    }
+    if (!isStationId(resolvedTo)) {
+      const stationId = await resolveInputToStationId(to);
+      if (stationId) {
+        resolvedTo = stationId;
+        setToId(stationId);
+      }
+    }
+
+    if (!isStationId(resolvedFrom) || !isStationId(resolvedTo)) {
+      Alert.alert(
+        "Pick stations from suggestions",
+        "We could not resolve station IDs for both stops. Please pick From and To from suggestions."
+      );
+      return;
+    }
+    await runJourneySearch(resolvedFrom, resolvedTo);
+  };
 
   const bootstrapNearestStation = async () => {
     setNearestLoading(true);
@@ -120,32 +218,29 @@ export default function TransportScreen() {
         return null;
       }
       const current = await Location.getCurrentPositionAsync({});
-      const geocode = await Location.reverseGeocodeAsync({
-        latitude: current.coords.latitude,
-        longitude: current.coords.longitude,
+      const stationRes = await getNearbyStations({
+        lat: current.coords.latitude,
+        lon: current.coords.longitude,
+        results: 20,
+        distance: 6000,
       });
-      const city =
-        geocode?.[0]?.city ??
-        geocode?.[0]?.district ??
-        geocode?.[0]?.subregion ??
-        "";
-
-      if (!city) {
-        setAutoSearchMessage("Could not detect nearby city. Please enter From station manually.");
-        return null;
-      }
-
-      const stationRes = await getStations(city);
-      const firstStation = Array.isArray(stationRes.data) ? stationRes.data[0] : null;
+      const firstStation = pickNearestWithDistance(stationRes.data, 4000);
       if (firstStation?.name) {
         setFrom(firstStation.name);
-        setAutoSearchMessage(null);
-        return firstStation.name as string;
+        setFromId(firstStation.id ?? null);
+        if (typeof firstStation.distance === "number" && firstStation.distance > 4000) {
+          setAutoSearchMessage(
+            `Using closest station (${(firstStation.distance / 1000).toFixed(
+              1
+            )} km away).`
+          );
+        } else {
+          setAutoSearchMessage(null);
+        }
+        return (firstStation.id || firstStation.name) as string;
       }
-
-      setFrom(city);
-      setAutoSearchMessage("Nearest station not found. Using city name as From.");
-      return city;
+      setAutoSearchMessage("Nearest station not found. Please enter From station manually.");
+      return null;
     } catch {
       setAutoSearchMessage("Auto origin failed. Please pick a From station manually.");
       return null;
@@ -157,34 +252,73 @@ export default function TransportScreen() {
   useEffect(() => {
     const autoTransport = params?.autoTransport === "1";
     const toName = typeof params?.toName === "string" ? params.toName : "";
-    if (!autoTransport || autoLoaded || !toName) return;
+    const destLat = typeof params?.destLat === "string" ? Number(params.destLat) : null;
+    const destLng = typeof params?.destLng === "string" ? Number(params.destLng) : null;
+    if (!autoTransport || !toName) return;
+    const autoKey = `${toName}|${destLat ?? ""}|${destLng ?? ""}`;
+    if (lastAutoTransportKeyRef.current === autoKey) return;
+    lastAutoTransportKeyRef.current = autoKey;
 
     const bootstrapFromLiveLocation = async () => {
-      setAutoLoaded(true);
+      setSearchActive(false);
+      setSelectedJourney(null);
       setTo(toName);
+      setToId(null);
       let fromCandidate = from;
+      let toCandidate = toName;
 
       try {
         const nearest = await bootstrapNearestStation();
         if (nearest) fromCandidate = nearest;
       } catch {}
 
-      if (fromCandidate.trim()) {
-        await runJourneySearch(fromCandidate, toName);
+      try {
+        if (destLat != null && destLng != null && Number.isFinite(destLat) && Number.isFinite(destLng)) {
+          const toNearbyRes = await getNearbyStations({
+            lat: destLat,
+            lon: destLng,
+            results: 20,
+            distance: 6000,
+          });
+          const nearestTo = pickNearestWithDistance(toNearbyRes.data, 4000);
+          if (nearestTo?.name) {
+            setTo(nearestTo.name);
+            setToId(nearestTo.id ?? null);
+            toCandidate = (nearestTo.id || nearestTo.name) as string;
+          }
+        }
+      } catch {}
+
+      if (isStationId(fromCandidate) && isStationId(toCandidate)) {
+        await runJourneySearch(fromCandidate, toCandidate);
       } else {
-        setAutoSearchMessage("Select a From station manually, then tap Search.");
+        setAutoSearchMessage(
+          "Auto station match incomplete. Pick From and To from suggestions, then tap Search."
+        );
       }
     };
 
     bootstrapFromLiveLocation();
-  }, [params, autoLoaded, from, dateTime]);
+  }, [params]);
 
   return (
     // <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View style={styles.container}>
+      <View
+        style={styles.container}
+        onTouchStart={() => {
+          Keyboard.dismiss();
+        }}
+      >
 
         {/* MAP ALWAYS EXISTS */}
-        <TransportMap journey={selectedJourney} />
+        <TransportMap
+          journey={selectedJourney}
+          onMapPress={() => {
+            Keyboard.dismiss();
+            setActiveField(null);
+            setSuggestions([]);
+          }}
+        />
 
         {/* 🔙 BACK BUTTON */}
         {searchActive && (
@@ -205,8 +339,14 @@ export default function TransportScreen() {
             <FromToInputs
               from={from}
               to={to}
-              onChangeFrom={setFrom}
-              onChangeTo={setTo}
+              onChangeFrom={(value) => {
+                setFrom(value);
+                setFromId(null);
+              }}
+              onChangeTo={(value) => {
+                setTo(value);
+                setToId(null);
+              }}
               onFocusFrom={() => setActiveField("from")}
               onFocusTo={() => setActiveField("to")}
               date={dateTime}
@@ -219,10 +359,7 @@ export default function TransportScreen() {
               }}
               onSearch={handleSearch}
               onUseNearestStation={async () => {
-                const nearest = await bootstrapNearestStation();
-                if (nearest && to.trim()) {
-                  await runJourneySearch(nearest, to);
-                }
+                await bootstrapNearestStation();
               }}
               nearestLoading={nearestLoading}
             />
@@ -252,10 +389,10 @@ export default function TransportScreen() {
                       onPress={() => {
                         if (activeField === "from") {
                           setFrom(item.name);
-                          setFromId(null);
+                          setFromId(item.id ?? null);
                         } else {
                           setTo(item.name);
-                          setToId(null);
+                          setToId(item.id ?? null);
                         }
                         setSuggestions([]);
                         setActiveField(null);

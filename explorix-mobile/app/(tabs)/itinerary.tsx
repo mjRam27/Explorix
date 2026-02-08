@@ -554,6 +554,23 @@ export default function ItineraryScreen() {
     });
   };
 
+  const goToTransport = (place: {
+    id: number;
+    title: string;
+    latitude: number;
+    longitude: number;
+  }) => {
+    router.push({
+      pathname: "/transport",
+      params: {
+        autoTransport: "1",
+        toName: place.title,
+        destLat: String(place.latitude),
+        destLng: String(place.longitude),
+      },
+    });
+  };
+
 
   const handleDelete = (id: string) => {
     Alert.alert(
@@ -1292,6 +1309,22 @@ export default function ItineraryScreen() {
                                 <Ionicons name="navigate" size={16} color="#fff" />
                               </TouchableOpacity>
                             )}
+                          {place.latitude != null &&
+                            place.longitude != null && (
+                              <TouchableOpacity
+                                style={styles.iconTransportBtn}
+                                onPress={() =>
+                                  goToTransport({
+                                    id: place.id,
+                                    title: place.name,
+                                    latitude: place.latitude as number,
+                                    longitude: place.longitude as number,
+                                  })
+                                }
+                              >
+                                <Ionicons name="bus" size={15} color="#fff" />
+                              </TouchableOpacity>
+                            )}
                           <TouchableOpacity
                             style={styles.iconTrashBtn}
                             onPress={() =>
@@ -1683,6 +1716,19 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  iconTransportBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: "#10b981",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
     shadowRadius: 3,
     elevation: 2,
   },

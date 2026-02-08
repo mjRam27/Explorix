@@ -17,3 +17,21 @@ export const getJourneys = (params: {
 
 export const getStations = (q: string) =>
   api.get("/transport/stations", { params: { q } });
+
+export const getNearbyStations = (params: {
+  lat: number;
+  lon: number;
+  results?: number;
+  distance?: number;
+}) =>
+  api.get("/transport/stations/nearby", {
+    params: {
+      lat: params.lat,
+      lon: params.lon,
+      results: params.results ?? 8,
+      distance: params.distance ?? 3000,
+    },
+  });
+
+export const seedStations = (q: string, limit = 50) =>
+  api.post("/transport/stations/seed", null, { params: { q, limit } });

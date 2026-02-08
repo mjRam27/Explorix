@@ -86,6 +86,49 @@ export default function ExploreScreen() {
   const autoRouteParam = typeof params?.autoRoute === "string" ? params.autoRoute : undefined;
   const hasValidCoords = (p: { latitude?: number; longitude?: number }) =>
     Number.isFinite(p.latitude) && Number.isFinite(p.longitude);
+  const toNum = (v: any) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const normalizePlace = (raw: any, idx = 0): Place | null => {
+    if (!raw) return null;
+    const latitude = toNum(raw.latitude ?? raw.lat);
+    const longitude = toNum(raw.longitude ?? raw.lon ?? raw.lng);
+    if (latitude == null || longitude == null) return null;
+    const title = String(raw.title ?? raw.name ?? "Unknown place");
+    const id = Number(raw.id ?? raw.place_id ?? idx + 1);
+    const distance_km = toNum(raw.distance_km ?? raw.distance) ?? undefined;
+    const category =
+      raw.category != null ? String(raw.category) : undefined;
+    return {
+      id: Number.isFinite(id) ? id : idx + 1,
+      title,
+      latitude,
+      longitude,
+      distance_km,
+      category,
+      map_url: raw.map_url ?? undefined,
+    };
+  };
+  const normalizePlaceList = (payload: any): Place[] => {
+    const list = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.places)
+      ? payload.places
+      : Array.isArray(payload?.results)
+      ? payload.results
+      : [];
+    const normalized = list
+      .map((item: any, idx: number) => normalizePlace(item, idx))
+      .filter((p: Place | null): p is Place => !!p);
+    const seen = new Set<string>();
+    return normalized.filter((p) => {
+      const key = `${p.id}-${p.title}-${p.latitude}-${p.longitude}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -210,7 +253,7 @@ export default function ExploreScreen() {
       limit,
       category,
     })
-      .then((res) => setPlaces(res.data))
+      .then((res) => setPlaces(normalizePlaceList(res.data)))
       .catch(() => setPlaces([]));
   }, [userLocation, region.latitude, region.longitude, appliedRadiusKm, category]);
 
@@ -239,11 +282,7 @@ export default function ExploreScreen() {
     searchTimerRef.current = setTimeout(() => {
       searchPlaces(searchText.trim())
         .then((res) => {
-          const remote = Array.isArray(res.data)
-            ? res.data
-            : Array.isArray((res.data as any)?.results)
-            ? (res.data as any).results
-            : [];
+          const remote = normalizePlaceList(res.data);
           const merged = [...localMatches, ...remote];
           const deduped: Place[] = [];
           const seen = new Set<string>();
@@ -334,7 +373,13 @@ export default function ExploreScreen() {
   };
 
   return (
-    <View style={styles.container} onTouchStart={() => Keyboard.dismiss()}>
+    <View
+      style={styles.container}
+      onTouchStart={() => {
+        Keyboard.dismiss();
+        setShowSuggestions(false);
+      }}
+    >
       {/* MAP */}
       <ExploreMap
         region={region}
@@ -386,7 +431,7 @@ export default function ExploreScreen() {
           <View style={styles.suggestionBox}>
             {suggestions.map((item) => (
               <TouchableOpacity
-                key={item.id}
+                key={`${item.id}-${item.title}`}
                 style={styles.suggestionRow}
                 onPress={() => {
                   setSearchText(item.title);

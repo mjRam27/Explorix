@@ -113,10 +113,41 @@ export default function JourneySheet({
 
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Next Stop</Text>
-              <Text style={styles.detailValue}>
+              <Text
+                style={styles.detailValue}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
                 {selectedJourney.legs?.[0]?.destination || selectedJourney.to}
               </Text>
             </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Connection</Text>
+              <Text
+                style={styles.detailValue}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {selectedJourney?.legs?.[0]?.line || selectedJourney?.line || "-"}
+              </Text>
+            </View>
+
+            {!!selectedJourney?.legs?.length && (
+              <View style={styles.transferList}>
+                {(selectedJourney.legs ?? [])
+                  .slice(0, -1)
+                  .map((leg: any, i: number) => {
+                    const next = selectedJourney.legs?.[i + 1];
+                    if (!next) return null;
+                    return (
+                      <Text key={`${leg?.destination}-${i}`} style={styles.transferText}>
+                        Change at {leg?.destination || "-"} to {next?.line || next?.mode || "next"}
+                      </Text>
+                    );
+                  })}
+              </View>
+            )}
 
             <TouchableOpacity
               style={styles.stopsToggle}
@@ -261,6 +292,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 6,
+    gap: 10,
   },
   detailLabel: {
     color: "#6b7280",
@@ -269,6 +301,9 @@ const styles = StyleSheet.create({
   detailValue: {
     fontSize: 14,
     fontWeight: "600",
+    flexShrink: 1,
+    textAlign: "right",
+    maxWidth: "68%",
   },
   stopsToggle: {
     marginTop: 8,
@@ -289,5 +324,13 @@ const styles = StyleSheet.create({
     color: "#4b5563",
     fontSize: 12,
     paddingVertical: 2,
+  },
+  transferList: {
+    marginTop: 4,
+  },
+  transferText: {
+    color: "#374151",
+    fontSize: 12,
+    marginTop: 3,
   },
 });
