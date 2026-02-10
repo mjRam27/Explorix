@@ -11,6 +11,14 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen
+              name="chat-screen"
+              options={{
+                animation: "slide_from_right",
+                gestureEnabled: true,
+                fullScreenGestureEnabled: true,
+              }}
+            />
           </Stack>
         </AuthProvider>
       </BottomSheetModalProvider>

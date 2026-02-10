@@ -96,8 +96,11 @@ export default function FeedScreen() {
           >
             <Ionicons name="search" size={20} color="#111827" />
           </Pressable>
-          <Pressable style={styles.headerIconBtn}>
-            <Ionicons name="notifications" size={20} color="#111827" />
+          <Pressable
+            style={styles.headerIconBtn}
+            onPress={() => router.push("/chat-screen")}
+          >
+            <Ionicons name="sparkles-outline" size={20} color="#111827" />
           </Pressable>
         </View>
       </View>
