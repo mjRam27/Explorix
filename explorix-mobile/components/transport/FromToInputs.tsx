@@ -35,23 +35,37 @@ export default function FromToInputs({
       {/* FROM + TO + SWAP */}
       <View style={styles.inputRow}>
         <View style={{ flex: 1 }}>
-          <TextInput
-            placeholder="From"
-            placeholderTextColor="#999"
-            value={from}
-            onChangeText={onChangeFrom}
-            onFocus={onFocusFrom}
-            style={styles.input}
-          />
+          <View style={styles.inputWrap}>
+            <TextInput
+              placeholder="From"
+              placeholderTextColor="#999"
+              value={from}
+              onChangeText={onChangeFrom}
+              onFocus={onFocusFrom}
+              style={styles.input}
+            />
+            {from.length > 0 && (
+              <TouchableOpacity style={styles.clearBtn} onPress={() => onChangeFrom("")}>
+                <Ionicons name="close" size={20} color="#666" />
+              </TouchableOpacity>
+            )}
+          </View>
 
-          <TextInput
-            placeholder="To"
-            placeholderTextColor="#999"
-            value={to}
-            onChangeText={onChangeTo}
-            onFocus={onFocusTo}
-            style={styles.input}
-          />
+          <View style={styles.inputWrap}>
+            <TextInput
+              placeholder="To"
+              placeholderTextColor="#999"
+              value={to}
+              onChangeText={onChangeTo}
+              onFocus={onFocusTo}
+              style={styles.input}
+            />
+            {to.length > 0 && (
+              <TouchableOpacity style={styles.clearBtn} onPress={() => onChangeTo("")}>
+                <Ionicons name="close" size={20} color="#666" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* SWAP BUTTON – RIGHT CENTER */}
@@ -106,6 +120,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 8,
     color: "#000",
+  },
+  inputWrap: {
+    position: "relative",
+  },
+  clearBtn: {
+    position: "absolute",
+    right: 8,
+    top: 7,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   swapButton: {

@@ -1,7 +1,6 @@
-import { View, TextInput, TouchableOpacity, Text, StyleSheet } from "react-native";
+import { View, TextInput, TouchableOpacity, Text, StyleSheet, Keyboard } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRef } from "react";
-import { Keyboard } from "react-native";
 
 export function SearchBar({ value, onChange, onSearch }: any) {
   const inputRef = useRef<TextInput | null>(null);
@@ -25,6 +24,11 @@ export function SearchBar({ value, onChange, onSearch }: any) {
           returnKeyType="search"
           style={styles.input}
         />
+        {String(value || "").length > 0 && (
+          <TouchableOpacity style={styles.clearBtn} onPress={() => onChange?.("")}>
+            <Ionicons name="close" size={20} color="#666" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <TouchableOpacity style={styles.button} onPress={handleSearch}>
@@ -46,12 +50,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
-
-    height: 44,                // 👈 makes it tall
-    paddingHorizontal: 19,     // 👈 spacious feel
-    borderRadius: 26,          // 👈 pill shape
-
-    shadowColor: "#000",       // 👇 shadow = premium
+    height: 44,
+    paddingHorizontal: 19,
+    borderRadius: 26,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
@@ -61,16 +63,24 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     marginLeft: 10,
-    fontSize: 16,              // 👈 bigger text
+    fontSize: 16,
+  },
+
+  clearBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 4,
   },
 
   button: {
-    height: 45,                // 👈 match input height
+    height: 45,
     backgroundColor: "#0f9d58",
     paddingHorizontal: 24,
     borderRadius: 26,
     justifyContent: "center",
-
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -84,4 +94,3 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 });
-

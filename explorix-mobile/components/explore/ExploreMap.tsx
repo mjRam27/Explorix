@@ -18,6 +18,7 @@ type Props = {
   sheetExpanded: boolean;
   onMarkerPress: (place: Place) => void;
   onUserPan: () => void;
+  onMapPress?: () => void;
 };
 
 export default function ExploreMap({
@@ -29,6 +30,7 @@ export default function ExploreMap({
   sheetExpanded,
   onMarkerPress,
   onUserPan,
+  onMapPress,
 }: Props) {
   const mapRef = useRef<MapView | null>(null);
 
@@ -74,6 +76,7 @@ export default function ExploreMap({
         rotateEnabled={!sheetExpanded}
         pitchEnabled={!sheetExpanded}
         onPanDrag={onUserPan}
+        onPress={onMapPress}
       >
         {userLocation && (
           <Marker coordinate={userLocation} title="You">

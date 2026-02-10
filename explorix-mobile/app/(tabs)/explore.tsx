@@ -47,6 +47,7 @@ export default function ExploreScreen() {
   const [activeSearch, setActiveSearch] = useState("");
   const [suggestions, setSuggestions] = useState<Place[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<Place | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [routeCoords, setRouteCoords] = useState<
     { latitude: number; longitude: number }[]
@@ -75,6 +76,7 @@ export default function ExploreScreen() {
 
   const locationWatchRef = useRef<Location.LocationSubscription | null>(null);
   const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const skipNextSearchEffectRef = useRef(false);
   const params = useLocalSearchParams();
   const lastHandledPlaceId = useRef<string | null>(null);
   const placeIdParam = typeof params?.placeId === "string" ? params.placeId : undefined;
@@ -258,6 +260,11 @@ export default function ExploreScreen() {
   }, [userLocation, region.latitude, region.longitude, appliedRadiusKm, category]);
 
   useEffect(() => {
+    if (skipNextSearchEffectRef.current) {
+      skipNextSearchEffectRef.current = false;
+      return;
+    }
+
     if (searchTimerRef.current) {
       clearTimeout(searchTimerRef.current);
     }
@@ -373,13 +380,7 @@ export default function ExploreScreen() {
   };
 
   return (
-    <View
-      style={styles.container}
-      onTouchStart={() => {
-        Keyboard.dismiss();
-        setShowSuggestions(false);
-      }}
-    >
+    <View style={styles.container}>
       {/* MAP */}
       <ExploreMap
         region={region}
@@ -388,6 +389,11 @@ export default function ExploreScreen() {
         userLocation={userLocation}
         routeCoords={routeCoords}
         sheetExpanded={sheetExpanded}
+        onMapPress={() => {
+          Keyboard.dismiss();
+          setShowSuggestions(false);
+          setShowRadius(false);
+        }}
         onMarkerPress={(place) => {
           setSelectedPlace(place);
           setRouteCoords([]);
@@ -404,23 +410,28 @@ export default function ExploreScreen() {
           value={searchText}
           onChange={(value: string) => {
             setSearchText(value);
+            setSelectedSuggestion(null);
             setShowSuggestions(true);
           }}
           onSearch={() => {
             Keyboard.dismiss();
-            const match = suggestions.find(
+            const exactMatch = suggestions.find(
               (s) => s.title.toLowerCase() === searchText.trim().toLowerCase()
             );
-            if (match && hasValidCoords(match)) {
-              setSelectedPlace(match);
+            const chosen = selectedSuggestion ?? exactMatch ?? null;
+            if (chosen && hasValidCoords(chosen)) {
+              setSearchText(chosen.title);
+              setActiveSearch(chosen.title);
+              setSelectedPlace(chosen);
               setFollowUser(false);
               setRegion((prev) => ({
                 ...prev,
-                latitude: match.latitude,
-                longitude: match.longitude,
+                latitude: chosen.latitude,
+                longitude: chosen.longitude,
               }));
+            } else {
+              setActiveSearch(searchText.trim());
             }
-            setActiveSearch(searchText);
             setSuggestions([]);
             setShowSuggestions(false);
             setShowRadius(false);
@@ -434,6 +445,8 @@ export default function ExploreScreen() {
                 key={`${item.id}-${item.title}`}
                 style={styles.suggestionRow}
                 onPress={() => {
+                  skipNextSearchEffectRef.current = true;
+                  setSelectedSuggestion(item);
                   setSearchText(item.title);
                   setActiveSearch(item.title);
                   setSuggestions([]);
