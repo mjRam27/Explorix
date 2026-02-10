@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Image, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
@@ -9,6 +9,7 @@ type Props = {
   onOpenSettings: () => void;
   onAddPost: () => void;
   onEditProfile: () => void;
+  onAvatarLongPress?: () => void;
 };
 
 export default function ProfileHeader({
@@ -19,6 +20,7 @@ export default function ProfileHeader({
   onOpenSettings,
   onAddPost,
   onEditProfile,
+  onAvatarLongPress,
 }: Props) {
   return (
     <View style={styles.container}>
@@ -42,7 +44,7 @@ export default function ProfileHeader({
       </View>
 
       {/* Avatar */}
-      <View style={styles.avatarWrap}>
+      <Pressable style={styles.avatarWrap} onLongPress={onAvatarLongPress} delayLongPress={500}>
         {avatarUrl ? (
           <Image source={{ uri: avatarUrl }} style={styles.avatar} />
         ) : (
@@ -50,7 +52,7 @@ export default function ProfileHeader({
             <Text style={styles.avatarText}>{name[0]}</Text>
           </View>
         )}
-      </View>
+      </Pressable>
 
       {/* Info */}
       <Text style={styles.name}>{name}</Text>

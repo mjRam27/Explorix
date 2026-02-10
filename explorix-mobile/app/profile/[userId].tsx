@@ -329,13 +329,24 @@ export default function PublicProfileScreen() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: 26 }} showsVerticalScrollIndicator={false}>
       <View style={styles.profileBlock}>
-        {user.avatar_url ? (
-          <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarFallback}>
-            <Text style={styles.avatarFallbackText}>{avatarLetter}</Text>
-          </View>
-        )}
+        <Pressable
+          onLongPress={() =>
+            setAvatarPreview({
+              id: user.id,
+              name: user.name || "User",
+              avatar_url: user.avatar_url ?? null,
+            })
+          }
+          delayLongPress={500}
+        >
+          {user.avatar_url ? (
+            <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarFallbackText}>{avatarLetter}</Text>
+            </View>
+          )}
+        </Pressable>
         <Text style={styles.name}>{user.name || "User"}</Text>
         {!!user.bio && <Text style={styles.bio}>{user.bio}</Text>}
 

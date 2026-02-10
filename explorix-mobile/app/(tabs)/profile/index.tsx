@@ -340,6 +340,13 @@ const handleLogout = () => {
           email={user.email}
           bio={user.bio ?? "Explorer - Travel - Life"}
           avatarUrl={user.avatar_url ?? null}
+          onAvatarLongPress={() =>
+            setAvatarPreview({
+              id: String(user.id || user.user_id || "me"),
+              name: user.name ?? user.email.split("@")[0],
+              avatar_url: user.avatar_url ?? null,
+            })
+          }
           onOpenSettings={() => setSettingsOpen(true)}
           onAddPost={() => router.push("/upload")}
           onEditProfile={() => router.push("/profile/edit")}

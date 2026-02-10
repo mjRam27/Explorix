@@ -2,7 +2,7 @@
 import "react-native-gesture-handler";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 
 export default function TabsLayout() {
   return (
@@ -20,7 +20,7 @@ export default function TabsLayout() {
           name="explore"
           options={{
             tabBarIcon: ({ color }) => (
-              <Ionicons name="map" size={22} color={color} />
+              <MaterialIcons name="explore" size={22} color={color} />
             ),
           }}
         />
@@ -49,10 +49,12 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="profile"
+          name="profile/index"
           options={{
+            title: "profile",
+            tabBarLabel: "profile",
             tabBarIcon: ({ color }) => (
-              <Ionicons name="person" size={22} color={color} />
+              <MaterialIcons name="person" size={22} color={color} />
             ),
           }}
         />

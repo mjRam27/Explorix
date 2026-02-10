@@ -61,6 +61,7 @@ export default function FeedPostCard({ post }: Props) {
   const [saved, setSaved] = useState(post.is_saved);
   const [likesCount, setLikesCount] = useState(resolvedLikesCount);
   const [commentsCount, setCommentsCount] = useState(resolvedCommentsCount);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const lastTapRef = useRef(0);
   const likeBurst = useRef(new Animated.Value(0)).current;
   const hasInlineCoords =
@@ -205,6 +206,10 @@ export default function FeedPostCard({ post }: Props) {
   }, [resolvedCommentsCount, post?.id]);
 
   useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [userAvatar]);
+
+  useEffect(() => {
     const sub = DeviceEventEmitter.addListener(
       "post:comment-updated",
       (payload: { postId?: string; count?: number; delta?: number }) => {
@@ -227,12 +232,13 @@ export default function FeedPostCard({ post }: Props) {
       <View style={styles.header}>
         <TouchableOpacity style={styles.userRow} onPress={openAuthorProfile}>
           <View style={styles.avatarWrap}>
-            {userAvatar ? (
+            {userAvatar && !avatarLoadFailed ? (
               <Image
                 source={{
                   uri: userAvatar,
                 }}
                 style={styles.avatar}
+                onError={() => setAvatarLoadFailed(true)}
               />
             ) : (
               <View style={styles.avatarFallback}>
