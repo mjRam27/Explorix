@@ -1,7 +1,17 @@
 // components/feed/FeedPostCard.tsx
-import { View, Text, Image, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import {
+  Animated,
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  DeviceEventEmitter,
+  Pressable,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 
 import {
@@ -50,6 +60,9 @@ export default function FeedPostCard({ post }: Props) {
   const [liked, setLiked] = useState(post.is_liked);
   const [saved, setSaved] = useState(post.is_saved);
   const [likesCount, setLikesCount] = useState(resolvedLikesCount);
+  const [commentsCount, setCommentsCount] = useState(resolvedCommentsCount);
+  const lastTapRef = useRef(0);
+  const likeBurst = useRef(new Animated.Value(0)).current;
   const hasInlineCoords =
     Number.isFinite(Number(post?.latitude)) &&
     Number.isFinite(Number(post?.longitude));
@@ -142,6 +155,31 @@ export default function FeedPostCard({ post }: Props) {
     }
   };
 
+  const onImagePress = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 280) {
+      likeBurst.stopAnimation();
+      likeBurst.setValue(0);
+      Animated.sequence([
+        Animated.timing(likeBurst, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.delay(350),
+        Animated.timing(likeBurst, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      if (!liked) {
+        toggleLike();
+      }
+    }
+    lastTapRef.current = now;
+  };
+
   /* SAVE */
   const toggleSave = async () => {
     const nextSaved = !saved;
@@ -161,6 +199,27 @@ export default function FeedPostCard({ post }: Props) {
       params: { userId },
     });
   };
+
+  useEffect(() => {
+    setCommentsCount(resolvedCommentsCount);
+  }, [resolvedCommentsCount, post?.id]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      "post:comment-updated",
+      (payload: { postId?: string; count?: number; delta?: number }) => {
+        if (String(payload?.postId || "") !== String(post?.id || "")) return;
+        if (Number.isFinite(Number(payload?.count))) {
+          setCommentsCount(Math.max(0, Number(payload?.count)));
+          return;
+        }
+        if (Number.isFinite(Number(payload?.delta))) {
+          setCommentsCount((prev) => Math.max(0, prev + Number(payload?.delta)));
+        }
+      }
+    );
+    return () => sub.remove();
+  }, [post?.id]);
 
   return (
     <View style={styles.card}>
@@ -196,7 +255,30 @@ export default function FeedPostCard({ post }: Props) {
       </View>
 
       {/* IMAGE */}
-      <Image source={{ uri: post.media_url }} style={styles.image} />
+      <View style={styles.imageWrap}>
+        <Pressable onPress={onImagePress}>
+          <Image source={{ uri: post.media_url }} style={styles.image} />
+        </Pressable>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.likeBurstOverlay,
+            {
+              opacity: likeBurst,
+              transform: [
+                {
+                  scale: likeBurst.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.55, 1.15],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <Ionicons name="heart" size={92} color="#ffffff" />
+        </Animated.View>
+      </View>
 
       {/* ACTIONS */}
       <View style={styles.actions}>
@@ -212,10 +294,24 @@ export default function FeedPostCard({ post }: Props) {
 
           <TouchableOpacity
             style={styles.iconWithCount}
-            onPress={() => router.push(`/comments/${post.id}`)}
+            onPress={() =>
+              router.push({
+                pathname: "/comments/[postId]",
+                params: {
+                  postId: String(post.id),
+                  post: encodeURIComponent(
+                    JSON.stringify({
+                      caption: post.caption ?? "",
+                      media_url: post.media_url ?? "",
+                      location_name: post.location_name ?? "",
+                    })
+                  ),
+                },
+              })
+            }
           >
             <Ionicons name="chatbubble-outline" size={22} color="#111827" />
-            <Text style={styles.iconCountText}>{resolvedCommentsCount}</Text>
+            <Text style={styles.iconCountText}>{commentsCount}</Text>
           </TouchableOpacity>
         </View>
         <TouchableOpacity onPress={toggleSave}>
@@ -228,7 +324,7 @@ export default function FeedPostCard({ post }: Props) {
       </View>
       <View style={styles.metaRow}>
         <Text style={styles.metaText}>{likesCount ?? 0} likes</Text>
-        <Text style={styles.metaText}>View all {resolvedCommentsCount} comments</Text>
+        <Text style={styles.metaText}>View all {commentsCount} comments</Text>
       </View>
 
       {/* CAPTION */}
@@ -310,6 +406,14 @@ const styles = StyleSheet.create({
     width: "100%",
     aspectRatio: 4 / 5,
     backgroundColor: "#eee",
+  },
+  imageWrap: {
+    position: "relative",
+  },
+  likeBurstOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
   },
   actions: {
     flexDirection: "row",
