@@ -10,11 +10,11 @@ from core.dependencies import get_current_user
 from posts.service import (
     create_post,
     get_my_posts,
-    get_user_posts,
     get_post_navigation,
     add_comment, get_comments
 )
 from posts.feed_service import get_my_posts_enriched
+from posts.feed_service import get_user_posts_enriched
 from db.db_redis import cache_json, get_cached_json, delete_keys_by_prefix
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
@@ -79,7 +79,7 @@ async def user_posts(
     limit: int = Query(20, le=50),
     db: AsyncSession = Depends(get_db)
 ):
-    return await get_user_posts(db, user_id, cursor, limit)
+    return await get_user_posts_enriched(db, user_id, cursor, limit)
 
 
 @router.get("/{post_id}/navigate")

@@ -200,8 +200,8 @@ export default function ItineraryGrid() {
                   {item.places.length === 0 ? (
                     <Text style={styles.empty}>No places stored.</Text>
                   ) : (
-                    item.places.map((name) => (
-                      <Text key={`${item.id}-${name}`} style={styles.place}>
+                    item.places.map((name, idx) => (
+                      <Text key={`${item.id}-${name}-${idx}`} style={styles.place}>
                         - {name}
                       </Text>
                     ))

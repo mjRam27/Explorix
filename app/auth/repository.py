@@ -37,6 +37,14 @@ class UserRepository:
         await db.commit()
 
     @staticmethod
+    async def get_by_name(db: AsyncSession, name: str):
+        result = await db.execute(
+            text("SELECT * FROM users WHERE lower(name) = lower(:name)"),
+            {"name": name},
+        )
+        return result.mappings().first()
+
+    @staticmethod
     async def get_by_id(db: AsyncSession, user_id: str):
         result = await db.execute(
             text("""

@@ -168,3 +168,59 @@ async def get_my_posts_enriched(
         }
         for post, likes_count, comments_count, is_liked, is_saved in result.all()
     ]
+
+
+async def get_user_posts_enriched(
+    db: AsyncSession,
+    user_id,
+    cursor: datetime | None = None,
+    limit: int = 20,
+):
+    stmt = (
+        select(
+            Post,
+            (
+                select(func.count(PostLike.id))
+                .where(PostLike.post_id == Post.id)
+                .scalar_subquery()
+            ).label("likes_count"),
+            (
+                select(func.count(PostComment.id))
+                .where(PostComment.post_id == Post.id)
+                .scalar_subquery()
+            ).label("comments_count"),
+        )
+        .where(Post.user_id == user_id)
+        .order_by(Post.created_at.desc())
+        .limit(limit)
+    )
+
+    if cursor:
+        stmt = stmt.where(Post.created_at < cursor)
+
+    result = await db.execute(stmt)
+
+    def resolve_media_url(value: str | None) -> str | None:
+        if not value:
+            return None
+        if value.startswith("http://") or value.startswith("https://"):
+            return value
+        return get_signed_url(value)
+
+    return [
+        {
+            "id": post.id,
+            "user_id": post.user_id,
+            "media_url": resolve_media_url(post.media_url),
+            "media_type": post.media_type,
+            "caption": post.caption,
+            "category": post.category,
+            "location_name": post.location_name,
+            "latitude": post.latitude,
+            "longitude": post.longitude,
+            "created_at": post.created_at,
+            "likes_count": likes_count,
+            "comments_count": comments_count,
+        }
+        for post, likes_count, comments_count in result.all()
+    ]

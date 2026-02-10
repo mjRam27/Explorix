@@ -3,9 +3,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
-from datetime import timedelta
-
-
 from fastapi import HTTPException
 
 from itinerary.models import Itinerary, ItineraryPlace
@@ -123,7 +120,8 @@ class ItineraryService:
         self,
         db: AsyncSession,
         user_id: UUID,
-        draft: dict
+        draft: dict,
+        start_date: date | None = None,
     ) -> Itinerary:
         """
         Persist itinerary draft created from chat.
@@ -135,25 +133,34 @@ class ItineraryService:
             raise HTTPException(400, "Invalid itinerary draft")
 
         # ✅ Convert UI draft → DB-safe structure
-        normalized = normalize_draft_for_persistence(draft)
+        normalized = normalize_draft_for_persistence(draft, start_date=start_date)
 
         destination = normalized["destination"]
         days = normalized["days"]
 
-        start_date = date.fromisoformat(days[0]["date"])
+        itinerary_start = date.fromisoformat(days[0]["date"])
         duration_days = len(days)
+        itinerary_end = itinerary_start + timedelta(days=duration_days - 1)
+        today = date.today()
+        if itinerary_end < today:
+            status = "past"
+        elif itinerary_start > today:
+            status = "soon"
+        else:
+            status = "current"
 
         itinerary = Itinerary(
             user_id=user_id,
             title=normalized["title"],
             destination=destination,
-            start_date=start_date,
-            end_date=start_date + timedelta(days=duration_days - 1),
+            start_date=itinerary_start,
+            end_date=itinerary_end,
             duration_days=duration_days,
             days=days,
             travel_style=normalized.get("travel_style"),
             tags=normalized.get("selected_categories") or [],
-            ai_generated=True
+            ai_generated=True,
+            status=status,
         )
 
         db.add(itinerary)

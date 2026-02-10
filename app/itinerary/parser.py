@@ -10,7 +10,7 @@ Purpose:
 """
 
 from typing import List, Dict
-from datetime import date
+from datetime import date, timedelta
 
 def convert_ai_response_to_itinerary(
     ai_text: str,
@@ -82,7 +82,7 @@ def convert_ai_response_to_itinerary(
         "editable": True
     }
 
-def normalize_draft_for_persistence(draft: Dict) -> Dict:
+def normalize_draft_for_persistence(draft: Dict, start_date: date | None = None) -> Dict:
     """
     Convert UI draft (slots-based) into DB-persistable itinerary structure.
     """
@@ -91,7 +91,7 @@ def normalize_draft_for_persistence(draft: Dict) -> Dict:
     if not destination:
         raise ValueError("Draft must include city or destination")
 
-    start_date = date.today()
+    base_date = start_date or date.today()
 
     normalized_days: List[Dict] = []
 
@@ -110,7 +110,7 @@ def normalize_draft_for_persistence(draft: Dict) -> Dict:
 
         normalized_days.append({
             "day": i,
-            "date": start_date.isoformat(),
+            "date": (base_date + timedelta(days=i - 1)).isoformat(),
             "places": places
         })
 

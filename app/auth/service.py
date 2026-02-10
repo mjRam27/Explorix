@@ -32,6 +32,15 @@ class AuthService:
                 detail="Email already registered",
             )
 
+        normalized_name = (name or "").strip()
+        if normalized_name:
+            existing_name = await UserRepository.get_by_name(db, normalized_name)
+            if existing_name:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Username already taken",
+                )
+
         print("🔵 hashing password")
         password_hash = hash_password(password)
         print("🔵 password hashed")
@@ -44,7 +53,7 @@ class AuthService:
             user_id,
             email,
             password_hash,
-            name,
+            normalized_name or None,
             country_code,
         )
 

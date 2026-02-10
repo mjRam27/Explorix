@@ -15,7 +15,7 @@ from social.service import (
     unfollow_user,
     get_discovery_feed
 )
-from db.db_redis import cache_json, get_cached_json
+from db.db_redis import cache_json, get_cached_json, delete_keys_by_prefix
 
 router = APIRouter(prefix="/social", tags=["Social"])
 
@@ -28,6 +28,8 @@ async def follow(
     user=Depends(get_current_user)
 ):
     await follow_user(db, user.id, user_id)
+    delete_keys_by_prefix("user_me:")
+    delete_keys_by_prefix(f"feed:{user.id}:")
     return {"status": "followed"}
 
 
@@ -39,6 +41,8 @@ async def unfollow(
     user=Depends(get_current_user)
 ):
     await unfollow_user(db, user.id, user_id)
+    delete_keys_by_prefix("user_me:")
+    delete_keys_by_prefix(f"feed:{user.id}:")
     return {"status": "unfollowed"}
 
 

@@ -1,36 +1,48 @@
 import {
-  View,
-  Text,
-  Image,
+  ActivityIndicator,
+  FlatList,
   StyleSheet,
+  Text,
   TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
-import { useMemo, useState } from "react";
-import {
-  likePost,
-  unlikePost,
-  savePost,
-  unsavePost,
-} from "../../api/posts";
+import { useEffect, useMemo, useRef, useState } from "react";
+import FeedPostCard from "../../components/feed/FeedPostCard";
+import { getMyPosts, getSavedPosts, getUserPosts } from "../../api/posts";
 
 type Post = {
   id: string;
+  user?: {
+    id?: string;
+    name?: string;
+    avatar_url?: string | null;
+  };
   media_url?: string;
+  mediaUrl?: string;
+  image_url?: string;
+  image?: string;
+  media?: { url?: string; media_url?: string } | null;
   caption?: string;
-  likes_count?: number;
-  comments_count?: number;
-  is_liked?: boolean;
-  is_saved?: boolean;
+  created_at?: string;
+  location_name?: string;
 };
 
 export default function PostDetailScreen() {
-  const { postId, post } = useLocalSearchParams<{
+  const { postId, post, posts, index, viewerUser, source, userId } = useLocalSearchParams<{
     postId: string;
     post?: string;
+    posts?: string;
+    index?: string;
+    viewerUser?: string;
+    source?: "my" | "saved" | "user";
+    userId?: string;
   }>();
+  const listRef = useRef<FlatList<Post>>(null);
+  const [fetchedPosts, setFetchedPosts] = useState<Post[] | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const parsedPost = useMemo<Post | null>(() => {
     if (!post) return null;
@@ -41,86 +53,135 @@ export default function PostDetailScreen() {
     }
   }, [post]);
 
-  const data = parsedPost ?? { id: postId };
-
-  const [liked, setLiked] = useState(!!data.is_liked);
-  const [saved, setSaved] = useState(!!data.is_saved);
-  const [likesCount, setLikesCount] = useState(data.likes_count ?? 0);
-  const [commentsCount] = useState(data.comments_count ?? 0);
-
-  const toggleLike = async () => {
-    const nextLiked = !liked;
-    setLiked(nextLiked);
-    setLikesCount((prev) => (nextLiked ? prev + 1 : prev - 1));
+  const parsedPosts = useMemo<Post[]>(() => {
+    if (!posts) return [];
     try {
-      nextLiked ? await likePost(data.id) : await unlikePost(data.id);
+      const decoded = JSON.parse(decodeURIComponent(posts));
+      return Array.isArray(decoded) ? decoded : [];
     } catch {
-      setLiked(liked);
-      setLikesCount(data.likes_count ?? 0);
+      return [];
     }
-  };
+  }, [posts]);
 
-  const toggleSave = async () => {
-    const nextSaved = !saved;
-    setSaved(nextSaved);
+  const parsedViewerUser = useMemo<{ id?: string; name?: string; avatar_url?: string | null } | null>(() => {
+    if (!viewerUser) return null;
     try {
-      nextSaved ? await savePost(data.id) : await unsavePost(data.id);
+      return JSON.parse(decodeURIComponent(viewerUser));
     } catch {
-      setSaved(saved);
+      return null;
     }
-  };
+  }, [viewerUser]);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!source) return;
+      setLoading(true);
+      try {
+        let res: any;
+        if (source === "my") {
+          res = await getMyPosts();
+        } else if (source === "saved") {
+          res = await getSavedPosts();
+        } else if (source === "user" && userId) {
+          res = await getUserPosts(String(userId));
+        }
+        const raw = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res?.data?.items)
+          ? res.data.items
+          : [];
+        if (mounted) setFetchedPosts(raw);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [source, userId]);
+
+  const data = useMemo<Post[]>(() => {
+    const base =
+      (fetchedPosts && fetchedPosts.length > 0 ? fetchedPosts : null) ??
+      (parsedPosts.length > 0 ? parsedPosts : parsedPost ? [parsedPost] : [{ id: postId }]);
+    return base.map((item: any) => ({
+      ...item,
+      media_url:
+        item.media_url ??
+        item.mediaUrl ??
+        item.image_url ??
+        item.image ??
+        item.media?.url ??
+        item.media?.media_url ??
+        undefined,
+      user: {
+        id: item?.user?.id || parsedViewerUser?.id,
+        name: item?.user?.name || item?.user?.username || parsedViewerUser?.name,
+        avatar_url:
+          item?.user?.avatar_url ||
+          item?.user?.avatarUrl ||
+          item?.user?.avatar ||
+          item?.user?.profile_pic ||
+          item?.user?.profile_image_url ||
+          item?.avatar_url ||
+          item?.avatarUrl ||
+          item?.avatar ||
+          item?.profile_pic ||
+          item?.profile_image_url ||
+          parsedViewerUser?.avatar_url ||
+          null,
+      },
+    }));
+  }, [parsedPost, parsedPosts, postId, parsedViewerUser, fetchedPosts]);
+
+  const initialIndex = useMemo(() => {
+    if (fetchedPosts && fetchedPosts.length > 0 && postId) {
+      const idxById = data.findIndex((p) => String(p.id) === String(postId));
+      if (idxById >= 0) return idxById;
+    }
+    const idx = Number(index ?? 0);
+    if (Number.isNaN(idx)) return 0;
+    return Math.max(0, Math.min(idx, Math.max(0, data.length - 1)));
+  }, [index, data, fetchedPosts, postId]);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Ionicons name="arrow-back" size={24} color="#111827" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Post</Text>
+        <Text style={styles.headerTitle}>Posts</Text>
         <View style={{ width: 24 }} />
       </View>
-
-      <View style={styles.mediaWrap}>
-        {data.media_url ? (
-          <Image
-            source={{ uri: data.media_url }}
-            style={styles.media}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.mediaPlaceholder} />
+      <FlatList
+        ref={listRef}
+        data={data}
+        keyExtractor={(item, idx) => `${item.id}-${idx}`}
+        initialScrollIndex={initialIndex}
+        showsVerticalScrollIndicator={false}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        onScrollToIndexFailed={({ index: failedIndex }) => {
+          setTimeout(() => {
+            listRef.current?.scrollToIndex({
+              index: Math.min(failedIndex, Math.max(0, data.length - 1)),
+              animated: true,
+            });
+          }, 250);
+        }}
+        renderItem={({ item }) => (
+          <FeedPostCard post={item as any} />
         )}
-      </View>
-
-      <View style={styles.actions}>
-        <TouchableOpacity onPress={toggleLike}>
-          <Ionicons
-            name={liked ? "heart" : "heart-outline"}
-            size={24}
-            color={liked ? "#e53935" : "#fff"}
-          />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push(`/comments/${data.id}`)}>
-          <Ionicons name="chatbubble-outline" size={22} color="#fff" />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }} />
-        <TouchableOpacity onPress={toggleSave}>
-          <Ionicons
-            name={saved ? "bookmark" : "bookmark-outline"}
-            size={22}
-            color="#fff"
-          />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.counts}>
-        <Text style={styles.countText}>{likesCount} likes</Text>
-        <Text style={styles.countText}>{commentsCount} comments</Text>
-      </View>
-
-      {data.caption ? (
-        <Text style={styles.caption}>{data.caption}</Text>
-      ) : null}
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.centered}><ActivityIndicator /></View>
+          ) : (
+            <View style={styles.centered}><Text style={styles.emptyText}>No posts found.</Text></View>
+          )
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -128,7 +189,7 @@ export default function PostDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0f0f10",
+    backgroundColor: "#fff",
   },
   header: {
     height: 52,
@@ -136,45 +197,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
+    backgroundColor: "#fff",
   },
   headerTitle: {
-    color: "#fff",
+    color: "#111827",
     fontSize: 16,
     fontWeight: "600",
   },
-  mediaWrap: {
-    width: "100%",
-    aspectRatio: 1,
-    backgroundColor: "#111",
+  list: {
+    backgroundColor: "#fff",
   },
-  media: {
-    width: "100%",
-    height: "100%",
+  listContent: {
+    paddingBottom: 16,
+    flexGrow: 1,
   },
-  mediaPlaceholder: {
+  centered: {
     flex: 1,
-    backgroundColor: "#222",
-  },
-  actions: {
-    flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 16,
+    justifyContent: "center",
+    paddingVertical: 40,
   },
-  counts: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  countText: {
-    color: "#fff",
-    fontSize: 13,
-    marginTop: 2,
-  },
-  caption: {
-    color: "#e6e6e6",
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    fontSize: 14,
+  emptyText: {
+    color: "#6b7280",
   },
 });

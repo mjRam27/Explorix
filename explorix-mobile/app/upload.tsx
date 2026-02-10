@@ -10,12 +10,14 @@ import {
   Alert,
 } from "react-native";
 import { useState } from "react";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import { Video } from "expo-av";
 import { createPost, uploadPostMedia } from "../api/posts";
+import { updateSnapDraft } from "../lib/snapDrafts";
 
 /* -------------------- CONSTANTS -------------------- */
 
@@ -33,12 +35,31 @@ type Category = (typeof CATEGORIES)[number];
 
 export default function UploadScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    draftId?: string;
+    draftUri?: string;
+    draftLat?: string;
+    draftLng?: string;
+    draftLocationName?: string;
+  }>();
 
-  const [mediaUri, setMediaUri] = useState<string | null>(null);
-  const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
+  const initialDraftUri =
+    typeof params?.draftUri === "string" ? params.draftUri : null;
+  const initialDraftId =
+    typeof params?.draftId === "string" ? params.draftId : null;
+  const initialDraftLat =
+    typeof params?.draftLat === "string" ? Number(params.draftLat) : null;
+  const initialDraftLng =
+    typeof params?.draftLng === "string" ? Number(params.draftLng) : null;
+  const initialDraftLocationName =
+    typeof params?.draftLocationName === "string" ? params.draftLocationName : "";
+  const [mediaUri, setMediaUri] = useState<string | null>(initialDraftUri);
+  const [mediaType, setMediaType] = useState<"image" | "video" | null>(
+    initialDraftUri ? "image" : null
+  );
   const [caption, setCaption] = useState("");
   const [category, setCategory] = useState<Category | null>(null);
-  const [locationName, setLocationName] = useState("");
+  const [locationName, setLocationName] = useState(initialDraftLocationName);
   const [hasAudio, setHasAudio] = useState(true);
   const [posting, setPosting] = useState(false);
 
@@ -74,6 +95,47 @@ export default function UploadScreen() {
     setPosting(true);
 
     try {
+      let latitude: number | null =
+        initialDraftLat != null && Number.isFinite(initialDraftLat)
+          ? initialDraftLat
+          : null;
+      let longitude: number | null =
+        initialDraftLng != null && Number.isFinite(initialDraftLng)
+          ? initialDraftLng
+          : null;
+      let autoLocationName: string | null = null;
+
+      if (latitude == null || longitude == null) {
+        try {
+          const locPerm = await Location.requestForegroundPermissionsAsync();
+          if (locPerm.status === "granted") {
+            const current = await Location.getCurrentPositionAsync({});
+            latitude = current.coords.latitude;
+            longitude = current.coords.longitude;
+            if (!locationName.trim()) {
+              const geo = await Location.reverseGeocodeAsync({
+                latitude,
+                longitude,
+              });
+              const first = geo?.[0];
+              if (first) {
+                autoLocationName =
+                  first.city ||
+                  first.subregion ||
+                  first.region ||
+                  first.country ||
+                  null;
+              }
+            }
+          }
+        } catch {
+          // Proceed without coordinates if location is unavailable.
+        }
+      }
+
+      if (initialDraftId) {
+        await updateSnapDraft(initialDraftId, { status: "uploading" });
+      }
       const fileName =
         mediaUri.split("/").pop() ??
         (mediaType === "video" ? "upload.mp4" : "upload.jpg");
@@ -97,13 +159,26 @@ export default function UploadScreen() {
         media_type: mediaType,
         category,
         caption,
-        location_name: locationName || null,
-        latitude: null,
-        longitude: null,
+        location_name: locationName || autoLocationName || null,
+        latitude,
+        longitude,
       });
+      if (initialDraftId) {
+        await updateSnapDraft(initialDraftId, {
+          status: "uploaded",
+          category,
+          caption,
+          latitude,
+          longitude,
+          location_name: locationName || autoLocationName || null,
+        });
+      }
 
       router.back();
     } catch (err) {
+      if (initialDraftId) {
+        await updateSnapDraft(initialDraftId, { status: "failed" });
+      }
       Alert.alert("Upload failed", "Please try again");
     } finally {
       setPosting(false);

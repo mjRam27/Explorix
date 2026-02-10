@@ -2,6 +2,7 @@
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from enum import Enum
+from datetime import date
 
 
 class Location(BaseModel):
@@ -33,3 +34,14 @@ class ChatResponse(BaseModel):
 
     # Present ONLY when type == ITINERARY_PROPOSAL
     itinerary_proposal: Optional[Dict[str, Any]] = None
+
+
+class CommitItineraryProposalRequest(BaseModel):
+    conversation_id: str
+    proposal_id: str
+    start_date: date
+
+
+class CommitItineraryProposalResponse(BaseModel):
+    status: str
+    itinerary_id: str
