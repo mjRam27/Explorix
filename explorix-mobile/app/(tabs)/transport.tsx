@@ -16,7 +16,6 @@ import * as Location from "expo-location";
 import TransportMap from "../../components/transport/TransportMap";
 import JourneySheet from "../../components/transport/JourneySheet";
 import FromToInputs from "../../components/transport/FromToInputs";
-import TransportFilters from "../../components/transport/TransportFilters";
 import DateTimeModal from "../../components/transport/DateTimeModal";
 import { getJourneys, getNearbyStations, getStations } from "../../api/transport";
 
@@ -28,7 +27,6 @@ export default function TransportScreen() {
   const [to, setTo] = useState("");
   const [fromId, setFromId] = useState<string | null>(null);
   const [toId, setToId] = useState<string | null>(null);
-  const [mode, setMode] = useState("all");
 
   const [dateTime, setDateTime] = useState(new Date());
   const [showDateModal, setShowDateModal] = useState(false);
@@ -36,7 +34,6 @@ export default function TransportScreen() {
   const [searchActive, setSearchActive] = useState(false);
   const [selectedJourney, setSelectedJourney] = useState<any>(null);
   const [journeys, setJourneys] = useState<any[]>([]);
-  const [allJourneys, setAllJourneys] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [activeField, setActiveField] = useState<"from" | "to" | null>(null);
@@ -57,18 +54,6 @@ export default function TransportScreen() {
     }
     return null;
   };
-
-  const normalizeMode = (m?: string) => (m || "").toLowerCase();
-
-  const filterJourneys = (items: any[], m: string) => {
-    if (m === "all") return items;
-    return items.filter((j) => normalizeMode(j.mode) === m);
-  };
-
-  const safeAllJourneys = Array.isArray(allJourneys) ? allJourneys : [];
-  const availableModes = Array.from(
-    new Set(safeAllJourneys.map((j) => normalizeMode(j.mode)).filter(Boolean))
-  );
 
   useEffect(() => {
     const query = activeField === "from" ? from : activeField === "to" ? to : "";
@@ -141,7 +126,6 @@ export default function TransportScreen() {
         } else {
           Alert.alert("No journeys", msg);
         }
-        setAllJourneys([]);
         setJourneys([]);
         setSearchActive(true);
         return;
@@ -152,8 +136,7 @@ export default function TransportScreen() {
         : Array.isArray(res.data)
         ? res.data
         : [];
-      setAllJourneys(list);
-      setJourneys(filterJourneys(list, mode));
+      setJourneys(list);
       setSearchActive(true);
     } catch {
       Alert.alert("No journeys", "Please try a different time or route.");
@@ -369,15 +352,6 @@ export default function TransportScreen() {
               </View>
             )}
 
-            <TransportFilters
-              active={mode}
-              onChange={(m) => {
-                setMode(m);
-                setJourneys(filterJourneys(allJourneys, m));
-                setSelectedJourney(null);
-              }}
-            />
-
             {activeField && suggestions.length > 0 && (
               <View style={styles.suggestionBox}>
                 <FlatList
@@ -427,8 +401,6 @@ export default function TransportScreen() {
             journeys={journeys}
             loading={loading}
             selectedJourney={selectedJourney}
-            activeMode={mode}
-            availableModes={availableModes}
             onSelectJourney={(journey) => setSelectedJourney(journey)}
             onBackToList={() => setSelectedJourney(null)}
           />
