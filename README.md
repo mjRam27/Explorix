@@ -1,10 +1,10 @@
-Explorix AI – Intelligent Travel Discovery Platform
+**Explorix AI – Intelligent Travel Discovery Platform**
 
 AI-powered travel assistant that combines geospatial search, transportation data, and conversational AI to help users explore places, plan journeys, and discover travel experiences.
 
 Explorix integrates geospatial databases, AI reasoning, and real-time transport information into a unified travel exploration platform.
-
-Project Overview
+**
+Project Overview**
 
 Explorix is a mobile-first travel assistant designed to help users discover locations, plan journeys, and explore transportation options using natural language queries.
 
@@ -30,8 +30,8 @@ Share travel experiences with other users
 
 This project was developed as part of a Master’s Thesis in Applied Computer Science.
 
-Problem Statement
-
+**Problem Statement
+**
 Travel planning typically requires users to interact with multiple separate platforms:
 
 Maps for navigation
@@ -44,7 +44,7 @@ This fragmented ecosystem makes it difficult for users to discover places, under
 
 Explorix addresses this by integrating travel discovery, transport information, and AI assistance into a single platform.
 
-Research Objective
+**Research Objective**
 
 The objective of this research is to design and implement an AI-powered travel assistant that:
 
@@ -74,7 +74,7 @@ Architecture Diagram
 
 (Insert your system architecture diagram here)
 
-Technology Stack
+**Technology Stack**
 Frontend
 
 React Native
@@ -130,7 +130,7 @@ Users can ask questions such as:
 
 The system retrieves relevant travel data and generates AI responses.
 
-Transport Integration
+**Transport Integration**
 
 Explorix integrates public transport APIs to provide:
 
