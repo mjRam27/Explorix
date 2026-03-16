@@ -6,8 +6,11 @@ import {
   PanResponder,
   Dimensions,
   ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import JourneyCard from "./JourneyCard";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 
@@ -16,10 +19,26 @@ const COLLAPSED_Y = SCREEN_HEIGHT * 0.62;
 const EXPANDED_Y = SCREEN_HEIGHT * 0.18;
 
 type Props = {
+  journeys?: any[];
+  loading?: boolean;
+  selectedJourney?: any | null;
+  activeMode?: string;
+  availableModes?: string[];
   onSelectJourney?: (journey: any) => void;
+  onBackToList?: () => void;
 };
 
-export default function JourneySheet({ onSelectJourney }: Props) {
+export default function JourneySheet({
+  journeys = [],
+  loading = false,
+  selectedJourney = null,
+  activeMode = "all",
+  availableModes = [],
+  onSelectJourney,
+  onBackToList,
+}: Props) {
+  const safeJourneys = Array.isArray(journeys) ? journeys : [];
+  const [showStops, setShowStops] = useState(false);
   const translateY = useRef(new Animated.Value(COLLAPSED_Y)).current;
   const startY = useRef(COLLAPSED_Y);
 
@@ -72,13 +91,90 @@ export default function JourneySheet({ onSelectJourney }: Props) {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.content}
       >
-        {Array.from({ length: 20 }).map((_, i) => (
-          <View key={i} style={styles.card}>
-            <Text style={styles.title}>Journey option {i + 1}</Text>
-            <Text style={styles.subtitle}>
-              09:{10 + i} → 09:{40 + i} • 1 change
-            </Text>
+        {selectedJourney && (
+          <View style={styles.detailCard}>
+            <View style={styles.detailHeader}>
+              <TouchableOpacity onPress={onBackToList}>
+                <Text style={styles.backText}>Back</Text>
+              </TouchableOpacity>
+              <Text style={styles.detailTitle}>Journey details</Text>
+              <View style={{ width: 50 }} />
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Estimated Arrival</Text>
+              <Text style={styles.detailValue}>
+                {new Date(selectedJourney.arrival).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Next Stop</Text>
+              <Text style={styles.detailValue}>
+                {selectedJourney.legs?.[0]?.destination || selectedJourney.to}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.stopsToggle}
+              onPress={() => setShowStops((v) => !v)}
+            >
+              <Text style={styles.stopsToggleText}>
+                Next stops
+              </Text>
+              <Text style={styles.stopsToggleText}>
+                {showStops ? "Hide" : "Show more"}
+              </Text>
+            </TouchableOpacity>
+
+            {showStops && (
+              <View style={styles.stopsList}>
+                {(selectedJourney.legs ?? []).flatMap((leg: any) =>
+                  (leg.stopovers ?? []).map((s: any) => s.name)
+                ).slice(0, 12).map((name: string, idx: number) => (
+                  <Text key={`${name}-${idx}`} style={styles.stopItem}>
+                    {name}
+                  </Text>
+                ))}
+              </View>
+            )}
           </View>
+        )}
+
+        {!selectedJourney && loading && (
+          <View style={styles.loading}>
+            <ActivityIndicator />
+            <Text style={styles.loadingText}>Loading journeys...</Text>
+          </View>
+        )}
+
+        {!selectedJourney && !loading && safeJourneys.length === 0 && (
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>
+              {activeMode !== "all"
+                ? `${activeMode.toUpperCase()} not available`
+                : "No journeys found"}
+            </Text>
+            {availableModes.length > 0 && (
+              <Text style={styles.emptyHint}>
+                Available: {availableModes.map((m) => m.toUpperCase()).join(", ")}
+              </Text>
+            )}
+          </View>
+        )}
+
+        {!selectedJourney && !loading &&
+          safeJourneys.map((j: any, i: number) => (
+          <TouchableOpacity
+            key={`${j.departure ?? "journey"}-${i}`}
+            onPress={() => onSelectJourney?.(j)}
+            activeOpacity={0.8}
+          >
+            <JourneyCard journey={j} index={i} />
+          </TouchableOpacity>
         ))}
       </ScrollView>
     </Animated.View>
@@ -117,21 +213,81 @@ const styles = StyleSheet.create({
     flexGrow: 1,   // ✅ REQUIRED
   },
 
-  card: {
-    backgroundColor: "#f7f7f7",
-    padding: 14,
-    borderRadius: 14,
+  loading: {
+    paddingVertical: 24,
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 8,
+    color: "#666",
+  },
+  empty: {
+    paddingVertical: 24,
+    alignItems: "center",
+  },
+  emptyText: {
+    color: "#666",
+  },
+  emptyHint: {
+    color: "#999",
+    marginTop: 6,
+    fontSize: 12,
+  },
+  detailCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#eee",
     marginBottom: 12,
   },
-
-  title: {
-    fontWeight: "600",
-    fontSize: 16,
+  detailHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
   },
-
-  subtitle: {
-    marginTop: 4,
-    color: "#555",
-    fontSize: 13,
+  backText: {
+    color: "#1d4ed8",
+    fontWeight: "600",
+  },
+  detailTitle: {
+    fontWeight: "600",
+    fontSize: 15,
+    color: "#111",
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 6,
+  },
+  detailLabel: {
+    color: "#6b7280",
+    fontSize: 12,
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  stopsToggle: {
+    marginTop: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+  },
+  stopsToggleText: {
+    color: "#1d4ed8",
+    fontWeight: "600",
+  },
+  stopsList: {
+    paddingTop: 6,
+  },
+  stopItem: {
+    color: "#4b5563",
+    fontSize: 12,
+    paddingVertical: 2,
   },
 });

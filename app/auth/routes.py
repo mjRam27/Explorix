@@ -45,3 +45,8 @@ async def get_me(current_user=Depends(get_current_user)):
         "email": current_user["email"],
         "created_at": current_user["created_at"],
     }
+
+@router.post("/logout")
+async def logout(current_user=Depends(get_current_user)):
+    print(f"🔴 LOGOUT: user {current_user['email']}")
+    return {"message": "Logged out"}

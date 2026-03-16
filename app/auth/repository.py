@@ -40,7 +40,7 @@ class UserRepository:
     async def get_by_id(db: AsyncSession, user_id: str):
         result = await db.execute(
             text("""
-                SELECT id, email, created_at
+                SELECT id, email, name, country_code, created_at
                 FROM users
                 WHERE id = :user_id
             """),

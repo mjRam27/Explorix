@@ -41,7 +41,7 @@ export default function RadiusSlider({ visible, value, onChange }: Props) {
       <Text style={styles.label}>Search radius: {value} km</Text>
       <Slider
         minimumValue={1}
-        maximumValue={20}
+        maximumValue={80}
         step={1}
         value={value}
         onValueChange={onChange}

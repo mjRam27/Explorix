@@ -15,7 +15,15 @@ from history.routes import router as history_router
 from social.routes import router as social_router
 from itinerary.routes import router as itinerary_router
 from places.router import router as places_router
+from debug.routes import router as debug_router
+from user.routes import router as users_router
+from posts.routes import router as posts_router
+from posts.social_routes import router as post_social_router
+from posts.save_routes import router as post_save_router
 
+from dotenv import load_dotenv
+load_dotenv()
+from uploads.routes import router as uploads_router
 
 
 
@@ -47,6 +55,15 @@ app.include_router(transport_router)
 app.include_router(history_router)
 app.include_router(social_router)
 app.include_router(itinerary_router)
+app.include_router(debug_router)
+app.include_router(users_router)
+app.include_router(posts_router)
+app.include_router(post_social_router)
+app.include_router(post_save_router)
+app.include_router(uploads_router)
+
+
+
 
 # ---- Health check ----
 @app.get("/")

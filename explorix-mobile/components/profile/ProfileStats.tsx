@@ -1,0 +1,52 @@
+import { View, Text, StyleSheet } from "react-native";
+
+type Props = {
+  posts: number;
+  followers: number;
+  following: number;
+  travelled: number;
+};
+
+export default function ProfileStats({
+  posts,
+  followers,
+  following,
+  travelled,
+}: Props) {
+  return (
+    <View style={styles.container}>
+      <Stat label="Posts" value={posts} />
+      <Stat label="Followers" value={followers} />
+      <Stat label="Following" value={following} />
+      <Stat label="Travelled" value={travelled} />
+    </View>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.value}>{value}</Text>
+      <Text style={styles.label}>{label}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginVertical: 16,
+  },
+  stat: {
+    alignItems: "center",
+  },
+  value: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  label: {
+    fontSize: 12,
+    color: "#666",
+  },
+});

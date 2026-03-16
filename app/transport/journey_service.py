@@ -75,6 +75,8 @@ def fetch_journey(from_station: str, to_station: str, products: list[str] = None
             total_changes = len(journey["legs"]) - 1
 
             for leg in journey["legs"]:
+                origin_loc = leg.get("origin", {}).get("location", {}) or {}
+                dest_loc = leg.get("destination", {}).get("location", {}) or {}
                 legs_info.append({
                     "line": leg.get("line", {}).get("name"),
                     "mode": leg.get("line", {}).get("mode"),
@@ -82,6 +84,10 @@ def fetch_journey(from_station: str, to_station: str, products: list[str] = None
                     "arrival": leg.get("arrival"),
                     "origin": leg.get("origin", {}).get("name"),
                     "destination": leg.get("destination", {}).get("name"),
+                    "origin_lat": origin_loc.get("latitude"),
+                    "origin_lng": origin_loc.get("longitude"),
+                    "destination_lat": dest_loc.get("latitude"),
+                    "destination_lng": dest_loc.get("longitude"),
                     "stopovers": [
                         {
                             "name": stop.get("stop", {}).get("name"),
@@ -96,6 +102,8 @@ def fetch_journey(from_station: str, to_station: str, products: list[str] = None
             # ✅ Extract key info from first and last legs
             first_leg = journey["legs"][0]
             last_leg = journey["legs"][-1]
+            first_origin_loc = first_leg.get("origin", {}).get("location", {}) or {}
+            last_dest_loc = last_leg.get("destination", {}).get("location", {}) or {}
 
             all_journeys.append({
                 "from": first_leg.get("origin", {}).get("name"),
@@ -108,6 +116,10 @@ def fetch_journey(from_station: str, to_station: str, products: list[str] = None
                 "platform": first_leg.get("platform"),
                 "delay": first_leg.get("delay", 0),
                 "changes": total_changes,
+                "from_lat": first_origin_loc.get("latitude"),
+                "from_lng": first_origin_loc.get("longitude"),
+                "to_lat": last_dest_loc.get("latitude"),
+                "to_lng": last_dest_loc.get("longitude"),
                 "legs": legs_info
             })
 
