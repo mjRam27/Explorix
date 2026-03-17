@@ -3,16 +3,17 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from chat.intent import ChatIntent, detect_intent
+from ai.inference import generate_explorix_response
+from chat.intent import ChatIntent, detect_intent, extract_days
 from chat.service import (
     append_message,
     build_messages_for_llm,
     create_conversation,
-    extract_city,
+    extract_city_from_db,
     get_itinerary_proposal,
     store_itinerary_proposal,
 )
+from ai.llama_client import generate_from_llama
 from core.dependencies import get_current_user
 from db.db_redis import delete_keys_by_prefix
 from db.postgres import get_db
@@ -52,11 +53,23 @@ async def chat(
     # POI SEARCH
     # =========================
     if intent == ChatIntent.POI_SEARCH:
+
+        query = req.message
+        if req.location and req.location.city:
+            query += f" in {req.location.city}"
+
         places = await rag_retriever.search_places(
             db=db,
-            query=f"{req.location.city if req.location else ''} {req.message}",
+            query=query,
             limit=8,
         )
+
+        if not places:
+            return ChatResponse(
+                conversation_id=conversation_id,
+                response="I couldn't find enough nearby places.",
+                type=ChatResponseType.TEXT,
+            )
 
         response = (
             "Here are some places you might like:\n"
@@ -85,31 +98,93 @@ async def chat(
         intent=intent,
     )
 
-    answer_en = await llm_service.generate_text(messages)
-    final_answer = translate_back(answer_en, user_lang)
+    answer_en = await generate_from_llama(messages)
+
+    # 🔥 IMPORTANT: do NOT translate itinerary
+    if intent == ChatIntent.ITINERARY_REQUEST:
+        final_answer = answer_en
+    else:
+        final_answer = translate_back(answer_en, user_lang)
 
     append_message(conversation_id, "user", req.message)
     append_message(conversation_id, "assistant", final_answer)
 
-    destination = (
-        req.location.city if req.location else extract_city(req.message)
-    ) if intent == ChatIntent.ITINERARY_REQUEST else None
-
+    # =========================
+    # ITINERARY HANDLING
+    # =========================
     itinerary_proposal = None
-    if intent == ChatIntent.ITINERARY_REQUEST and destination:
-        places = await rag_retriever.search_places(
-            db=db,
-            query=destination,
-            limit=10,
-        )
+
+    if intent == ChatIntent.ITINERARY_REQUEST:
+
+        # 🔥 detect nearby intent
+        text = req.message.lower()
+        is_nearby = any(x in text for x in ["near me", "nearby", "around me"])
+
+        # =========================
+        # CASE 1: NEARBY
+        # =========================
+        if is_nearby and req.location:
+
+            places = await rag_retriever.search_places(
+                db=db,
+                query="nearby",
+                lat=req.location.lat,
+                lng=req.location.lng,
+                limit=12,
+            )
+
+            if not places:
+                return ChatResponse(
+                    conversation_id=conversation_id,
+                    response="I couldn't find enough nearby places to create an itinerary.",
+                    type=ChatResponseType.TEXT,
+                )
+
+            destination = "Your current location"
+
+        # =========================
+        # CASE 2: CITY
+        # =========================
+        else:
+            destination = (
+                req.location.city
+                if req.location and req.location.city
+                else await extract_city_from_db(db, req.message)
+            )
+
+            if not destination:
+                return ChatResponse(
+                    conversation_id=conversation_id,
+                    response="Please specify a destination city or allow location access.",
+                    type=ChatResponseType.TEXT,
+                )
+
+            places = await rag_retriever.search_places(
+                db=db,
+                query=destination,
+                limit=12,
+            )
+            if not places:
+                return ChatResponse(
+                    conversation_id=conversation_id,
+                    response="I couldn't find enough places.",
+                    type=ChatResponseType.TEXT,
+                )
+
+        # =========================
+        # PARSE ITINERARY
+        # =========================
+        days = extract_days(req.message)
 
         itinerary_draft = convert_ai_response_to_itinerary(
-            ai_text=final_answer,
+            ai_text=answer_en,   # 🔥 use ENGLISH version
             city=destination,
             places=places,
+            # days=days,
         )
 
         proposal_id = str(uuid4())
+
         itinerary_proposal = {
             "proposal_id": proposal_id,
             "destination": destination,
@@ -117,6 +192,7 @@ async def chat(
             "can_save": True,
             "draft": itinerary_draft,
         }
+
         store_itinerary_proposal(
             conversation_id=conversation_id,
             proposal_id=proposal_id,
@@ -131,11 +207,8 @@ async def chat(
             if intent == ChatIntent.ITINERARY_REQUEST
             else ChatResponseType.TEXT
         ),
-        itinerary_proposal=(
-            itinerary_proposal if intent == ChatIntent.ITINERARY_REQUEST else None
-        ),
+        itinerary_proposal=itinerary_proposal,
     )
-
 
 @router.post("/chat/itinerary/commit", response_model=CommitItineraryProposalResponse)
 async def commit_chat_itinerary(

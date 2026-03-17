@@ -4,18 +4,15 @@ import httpx
 LLAMA_URL = "http://127.0.0.1:8080/completion"
 
 
-def messages_to_prompt(messages: list[dict]) -> str:
+def messages_to_prompt(messages):
     prompt = ""
 
     for m in messages:
-        if m["role"] == "system":
-            prompt += f"<|system|>\n{m['content'].strip()}\n"
-        elif m["role"] == "user":
-            prompt += f"<|user|>\n{m['content'].strip()}\n"
-        elif m["role"] == "assistant":
-            prompt += f"<|assistant|>\n{m['content'].strip()}\n"
+        role = m["role"].capitalize()
+        content = m["content"]
+        prompt += f"### {role}:\n{content}\n\n"
 
-    prompt += "<|assistant|>\n"
+    prompt += "### Assistant:\n"
     return prompt
 
 
@@ -25,13 +22,19 @@ async def generate_from_llama(messages):
     payload = {
     "prompt": prompt,
     "n_predict": 200,
-    "temperature": 0.6,
+    "temperature": 0.3,
     "top_p": 0.9,
-    "repeat_penalty": 1.1,
-    "stop": ["<|user|>"]
+    "repeat_penalty": 1.2,
+    "stop": ["### User:", "### Assistant:"]
     }
 
     async with httpx.AsyncClient(timeout=120) as client:
         r = await client.post(LLAMA_URL, json=payload)
         r.raise_for_status()
-        return r.json()["content"].strip()
+        data = r.json()
+        content = data.get("content", "").strip()
+
+        if "### Assistant:" in content:
+            content = content.split("### Assistant:")[-1].strip()
+
+        return content
